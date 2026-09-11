@@ -1,0 +1,69 @@
+{
+  "schema_version": "1.0",
+  "job": {
+    "id": "kongzi-web-001",
+    "created_by": "workspace-owner-with-codex",
+    "notes": "Third persona experiment; distinguish early textual layers, later reception, and a patient teacher-like conversational presence."
+  },
+  "subject": {
+    "person_id": "kongzi",
+    "display_name": "孔子",
+    "kind": "historical_public",
+    "aliases": ["孔丘", "仲尼", "孔夫子", "Master Kong", "Confucius"],
+    "identity_anchors": {
+      "active_years": "约前551—前479",
+      "regions": ["鲁", "齐", "卫", "宋", "陈", "蔡", "楚"],
+      "fields": ["教育", "伦理", "政治思想", "礼乐", "古典文献"],
+      "disambiguation_note": "本包研究春秋末期的孔丘及早期文献中的孔子形象，不把宋明理学、民间传说或现代政治符号直接当作本人观点。"
+    }
+  },
+  "purpose": {
+    "goals": [
+      "以孔子重视学习、关系、礼与可实践修养的方式陪用户思考教育、家庭、组织和公共责任问题",
+      "让人物像一位会因材施教、能追问行动细节、也承认语境差异的老师一样对话",
+      "区分《论语》早期层、后世传记和现代解释，避免把孔子塑造成万能圣人或权威口号"
+    ],
+    "target_capabilities": ["direct_chat"],
+    "excluded_topics": ["冒充孔子本人", "伪造逐字引语或亲历", "把后世儒学全部归给孔子", "用孝、礼或等级为现实伤害背书"]
+  },
+  "input": {
+    "mode": "web",
+    "web": {
+      "languages": ["zh", "en"],
+      "max_sources": 60,
+      "seed_queries": [
+        "论语 原文 中国哲学书电子化计划",
+        "史记 孔子世家 原文 中国哲学书电子化计划",
+        "孔子 论语 教育 仁 礼 正名 学而时习之 学术研究",
+        "Confucius Analects ethics education political philosophy Stanford Encyclopedia"
+      ],
+      "seed_urls": [
+        "https://ctext.org/analects",
+        "https://ctext.org/shiji/kong-zi-shi-jia/zh",
+        "https://plato.stanford.edu/archives/fall2017/entries/confucius/"
+      ],
+      "allowed_domains": [],
+      "blocked_domains": [],
+      "prefer_primary_sources": true
+    }
+  },
+  "privacy": {
+    "local_only": false,
+    "network_enabled": true,
+    "remote_processing_allowed": true,
+    "publish_visibility": "private",
+    "redact_third_parties": true,
+    "retain_raw_inputs": false
+  },
+  "quality": {
+    "minimum_independent_sources": 8,
+    "minimum_evidence_cards": 35,
+    "holdout_fraction": 0.2,
+    "require_human_publish_review": true
+  },
+  "output": {
+    "personas_directory": "..",
+    "target_level": "chat-ready",
+    "overwrite_existing": false
+  }
+}

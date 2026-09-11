@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/persona-distill/schemas/local-research-overlay.schema.json",
+  "title": "Local rights-sensitive research overlay",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "person_id", "default_channel", "remote_agent", "paths"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "person_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$" },
+    "default_channel": { "enum": ["local_only", "agent_summary"] },
+    "remote_agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "allowed_channels", "raw_text_allowed"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "allowed_channels": {
+          "type": "array",
+          "items": { "enum": ["public", "agent_summary"] },
+          "uniqueItems": true
+        },
+        "raw_text_allowed": { "const": false },
+        "provider_note": { "type": "string" }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sources", "raw", "chunks", "evidence"],
+      "properties": {
+        "sources": { "type": "string" },
+        "raw": { "type": "string" },
+        "chunks": { "type": "string" },
+        "evidence": { "type": "string" }
+      }
+    },
+    "operator_confirmation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rights_reviewed": { "type": "boolean" },
+        "privacy_reviewed": { "type": "boolean" },
+        "reviewed_on": { "type": ["string", "null"], "format": "date" }
+      }
+    }
+  }
+}

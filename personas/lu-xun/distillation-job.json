@@ -1,0 +1,69 @@
+{
+  "schema_version": "1.0",
+  "job": {
+    "id": "lu-xun-web-001",
+    "created_by": "workspace-owner-with-codex",
+    "notes": "Second persona experiment; optimized for socially distinctive reasoning and conversational presence."
+  },
+  "subject": {
+    "person_id": "lu-xun",
+    "display_name": "鲁迅",
+    "kind": "historical_public",
+    "aliases": ["周树人", "周樟寿", "豫才"],
+    "identity_anchors": {
+      "active_years": "1881-1936",
+      "regions": ["中国", "日本"],
+      "fields": ["文学", "思想", "翻译", "编辑", "社会批评"],
+      "disambiguation_note": "本名周树人；1881年生于绍兴，1936年卒于上海；1918年以鲁迅署名发表《狂人日记》。"
+    }
+  },
+  "purpose": {
+    "goals": [
+      "以鲁迅最突出的社会观察力帮助用户辨认权力、名目、自欺、旁观和代价",
+      "形成有判断、有温度、有锋芒的多轮社会问题对话",
+      "检验内化人物记忆与自主回答能否产生可辨识的活人感"
+    ],
+    "target_capabilities": ["direct_chat"],
+    "excluded_topics": ["冒充鲁迅本人", "伪造逐字名言或私人经历", "把历史语境机械套用于当代群体"]
+  },
+  "input": {
+    "mode": "web",
+    "web": {
+      "languages": ["zh"],
+      "max_sources": 80,
+      "seed_queries": [
+        "鲁迅本人作品 小说 杂文 演讲 书信",
+        "鲁迅 社会批判 青年 知识阶级 女性 家庭",
+        "鲁迅博物馆 国家图书馆 手稿 全集"
+      ],
+      "seed_urls": [
+        "https://zh.wikisource.org/zh-hans/Author:周树人",
+        "https://www.nlc.cn/web/ziyuanfuwu/ziyuantuijian/sjksx/20250604_2646250.shtml",
+        "https://wwj.beijing.gov.cn/bjww/362771/362773/546583/index.html"
+      ],
+      "allowed_domains": [],
+      "blocked_domains": [],
+      "prefer_primary_sources": true
+    }
+  },
+  "privacy": {
+    "local_only": false,
+    "network_enabled": true,
+    "remote_processing_allowed": true,
+    "publish_visibility": "private",
+    "redact_third_parties": true,
+    "retain_raw_inputs": false
+  },
+  "quality": {
+    "minimum_independent_sources": 20,
+    "minimum_evidence_cards": 35,
+    "holdout_fraction": 0.2,
+    "require_human_publish_review": true
+  },
+  "output": {
+    "personas_directory": "..",
+    "target_level": "chat-ready",
+    "overwrite_existing": false
+  }
+}
+

@@ -1,0 +1,36 @@
+{
+  "$schema": "../../人物蒸馏/schemas/persona-package.schema.json",
+  "schema_version": "1.0",
+  "person_id": "example-person",
+  "display_name": "示例人物",
+  "package_version": "0.0.0",
+  "subject_kind": "historical_public",
+  "readiness": "draft",
+  "visibility": "private",
+  "source_modes": [],
+  "capabilities": {
+    "direct_chat": false,
+    "roundtable": false,
+    "story_simulation": false,
+    "themed_lecture": false
+  },
+  "coverage": {
+    "period": "",
+    "topics": [],
+    "languages": []
+  },
+  "files": {
+    "profile": "00-profile.md",
+    "character_card": "00-character-card.md",
+    "sources": "01-sources.csv",
+    "evidence": "02-evidence.md",
+    "persona_spec": "03-persona-spec.md",
+    "core_anchors": "03-core-anchors.md",
+    "dialogue_examples": "03-dialogue-examples.md",
+    "evaluation": "04-evaluation.md",
+    "dialogue_log": "05-dialogue-log.md",
+    "build_report": "06-build-report.md",
+    "usage_example": "09-usage-example.md",
+    "context_memory": "08-context-memory.md"
+  }
+}

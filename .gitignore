@@ -1,0 +1,40 @@
+# Local distillation jobs may contain private uploads, transcripts, and model caches.
+人物蒸馏/runs/
+
+# Local dialogue sessions and runtime configuration are private by default.
+直接对话/sessions/
+定题演讲/sessions/
+圆桌会议/sessions/
+故事推演/sessions/
+.persona/config.toml
+.persona/preview.local.json
+.env
+.env.*
+!.env.example
+.venv/
+
+# Generated Python bytecode is never part of a persona package.
+**/__pycache__/
+*.pyc
+
+# Raw source material is local by default. Publish only rights-cleared derivatives explicitly.
+personas/*/raw/*
+!personas/_template/raw/.gitkeep
+!personas/*/raw/README.md
+
+# Rights-sensitive research overlays stay on the researcher's machine. Only the
+# explanation and blank example contract are distributable.
+personas/*/research.local/*
+!personas/*/research.local/README.md
+!personas/*/research.local/overlay.example.json
+
+# Merged runtime memory may contain local-only derivatives and is rebuildable.
+personas/*/.runtime.local/
+
+# Common private records generated from the templates.
+**/*.private.md
+**/*.private.json
+
+# Keep distributable blank templates, while generated copies remain ignored.
+!人物蒸馏/_template/*.private.md
+!人物蒸馏/_template/*.private.json

@@ -1,0 +1,2 @@
+source_id,ingest_mode,title,creator_or_speaker,source_type,first_published,date_of_event,url_or_local_reference,language,grade,rights_or_permission,privacy_level,content_checksum,coverage_topics,location_marker,transcript_status,notes
+P-YYYY-001,<web/upload>,<标题>,<作者/说话人>,<书/访谈/演讲/视频/书信/聊天>,YYYY-MM-DD,YYYY-MM-DD,<链接或本地相对路径>,<语言>,A,<版权或授权状态>,<public/private/restricted>,<sha256>,<主题1;主题2>,<页码/章节/时间戳>,<未处理/已转写/已核验>,<上下文与可靠性备注>

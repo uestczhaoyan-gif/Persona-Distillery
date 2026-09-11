@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/persona-distill/schemas/normalized-chunk.schema.json",
+  "title": "Normalized persona source chunk",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "chunk_id",
+    "source_id",
+    "content_kind",
+    "content_mode",
+    "text",
+    "speaker",
+    "date",
+    "language",
+    "location",
+    "direct_quote",
+    "topics",
+    "privacy_level",
+    "rights_mode",
+    "checksum"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "chunk_id": { "type": "string", "pattern": "^P-[0-9]{4}-[0-9]{3}#C-[0-9]{4}$" },
+    "source_id": { "type": "string", "pattern": "^P-[0-9]{4}-[0-9]{3}$" },
+    "content_kind": { "type": "string", "minLength": 1 },
+    "content_mode": { "enum": ["full_text", "excerpt", "summary", "metadata_only"] },
+    "text": { "type": "string" },
+    "speaker": { "type": ["string", "null"] },
+    "date": { "type": ["string", "null"] },
+    "language": { "type": "string", "minLength": 2 },
+    "location": { "type": "string", "minLength": 1 },
+    "direct_quote": { "type": "boolean" },
+    "topics": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "privacy_level": { "enum": ["public", "private", "sensitive"] },
+    "rights_mode": { "enum": ["publishable_text", "local_only_text", "summary_only", "metadata_only"] },
+    "delivery_channel": { "enum": ["public", "agent_summary", "local_only"] },
+    "checksum": { "type": "string", "minLength": 1 }
+  }
+}

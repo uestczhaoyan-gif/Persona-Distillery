@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/persona-distill/schemas/context-memory.schema.json",
+  "title": "Context-rich persona memory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "memory_id", "title", "period", "situation", "observed_move", "tension", "dialogue_use", "source_ids", "topics", "confidence", "status"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "memory_id": { "type": "string", "pattern": "^M-[0-9]{4}$" },
+    "title": { "type": "string", "minLength": 1 },
+    "period": { "type": "string", "minLength": 1 },
+    "situation": { "type": "string", "minLength": 1 },
+    "observed_move": { "type": "string", "minLength": 1 },
+    "tension": { "type": "string", "minLength": 1 },
+    "dialogue_use": { "type": "string", "minLength": 1 },
+    "source_ids": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^P-[0-9]{4}-[0-9]{3}$" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "topics": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "confidence": { "enum": ["high", "medium", "low"] },
+    "status": { "enum": ["candidate", "reviewed", "withdrawn"] }
+  }
+}

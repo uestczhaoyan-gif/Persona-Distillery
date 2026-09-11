@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/persona-distill/roundtable/schemas/moderator-decision.schema.json",
+  "title": "Roundtable moderator decision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "action", "next_speaker", "responds_to", "instruction", "reason", "stop_signal"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "action": { "enum": ["speak", "pause", "ask_user", "fact_check", "end_section", "end_session"] },
+    "next_speaker": { "type": ["string", "null"], "pattern": "^[a-z0-9][a-z0-9-]{1,63}$" },
+    "responds_to": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "instruction": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string", "minLength": 1 },
+    "stop_signal": { "enum": ["none", "section_ready", "session_ready", "risk", "needs_user", "needs_fact_check"] }
+  }
+}

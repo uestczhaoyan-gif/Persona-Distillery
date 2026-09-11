@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0",
+  "person_id": "lu-xun",
+  "package_version": "0.3.0",
+  "built_on": "2026-08-04",
+  "canonical_inputs": {
+    "sources": "../../01-sources.csv",
+    "evidence_review": "../../02-evidence.md",
+    "chunks": "../chunks.jsonl",
+    "evidence": "../evidence.jsonl",
+    "context_review": "../../08-context-memory.md",
+    "context_memory": "../context-memory.jsonl"
+  },
+  "records": {
+    "sources": 55,
+    "chunks": 54,
+    "evidence": 43,
+    "context_memory": 72,
+    "search_rows": 169
+  },
+  "full_text_index": {
+    "path": "memory.sqlite3",
+    "engine": "SQLite FTS5",
+    "tokenizer": "trigram"
+  },
+  "vector_index": {
+    "path": "vectors.npy",
+    "records": "records.jsonl",
+    "method": "hashed-char-ngram-v1",
+    "dimensions": 4096,
+    "dtype": "float32",
+    "normalized": true,
+    "semantic_embeddings": false,
+    "note": "Deterministic offline lexical vectors; rebuild with an embedding provider for semantic retrieval."
+  },
+  "checksums": {
+    "sources_sha256": "34092fdff55cc70f428d75ef8881c541906d2dbc1c93647a582107dab809bef1",
+    "evidence_markdown_sha256": "ee121ff9068a0fbc0fa6776a5205c95997207e8a464ad0e474e1933b2f065fb1",
+    "chunks_jsonl_sha256": "c6bb95bfdc84d9223088069bb73d7c63d1fd83a1621381874c520e9189f18ce7",
+    "evidence_jsonl_sha256": "f66ad0257e3fcfea5b8d4d554d423365da847bd7e7b95d8873c0b78b172dc353",
+    "context_markdown_sha256": "0eb33742124eac37c449c611dd3522772bdbd748e4cec9ab94cef9eacc3419cb",
+    "context_jsonl_sha256": "5db47b3723b7648e21ec16d9e7d36e9d90ba6112b440ff785f81c93d2f2577f0"
+  }
+}

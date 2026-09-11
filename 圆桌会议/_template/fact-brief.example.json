@@ -1,0 +1,14 @@
+{
+  "$schema": "../schemas/fact-brief.schema.json",
+  "schema_version": "1.0",
+  "brief_id": "FB-20260806-001",
+  "session_id": "RT-20260806-001",
+  "policy": "facts_only",
+  "question": "本场没有需要核验的外部事实；以下仅为结构示例。",
+  "as_of": "2026-08-06T12:00:00+08:00",
+  "facts": [],
+  "sources": [],
+  "disagreements": [],
+  "status": "current",
+  "expires_on": "2026-08-07T12:00:00+08:00"
+}

@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/persona-distill/roundtable/schemas/session.schema.json",
+  "title": "Roundtable session",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_version",
+    "session_id",
+    "title",
+    "topic",
+    "goal",
+    "participants",
+    "user_role",
+    "network_policy",
+    "limits",
+    "status",
+    "preview_override",
+    "created_at",
+    "updated_at",
+    "state_version",
+    "current"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema_version": { "const": "1.0" },
+    "protocol_version": { "const": "roundtable-runtime/0.1.0" },
+    "session_id": { "type": "string", "pattern": "^RT-[0-9]{8}-[0-9]{3,}$" },
+    "title": { "type": "string", "minLength": 1 },
+    "topic": { "type": "string", "minLength": 1 },
+    "goal": { "type": "string", "minLength": 1 },
+    "participants": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["person_id", "display_name", "package_version", "adapter_version"],
+        "properties": {
+          "person_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$" },
+          "display_name": { "type": "string", "minLength": 1 },
+          "package_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+          "adapter_version": { "type": "string", "pattern": "^roundtable-adapter/[0-9]+\\.[0-9]+\\.[0-9]+$" },
+          "preview_override": { "type": "boolean", "default": false }
+        }
+      }
+    },
+    "user_role": { "enum": ["observer", "participant", "moderator"] },
+    "network_policy": { "enum": ["off", "facts_only", "research"] },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_sections", "max_turns", "max_chars_per_turn", "no_new_claim_limit"],
+      "properties": {
+        "max_sections": { "type": "integer", "minimum": 1, "maximum": 20 },
+        "max_turns": { "type": "integer", "minimum": 2, "maximum": 200 },
+        "max_chars_per_turn": { "type": "integer", "minimum": 200, "maximum": 10000 },
+        "no_new_claim_limit": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "max_seconds": { "type": "integer", "minimum": 30 },
+        "max_cost_units": { "type": "number", "minimum": 0 }
+      }
+    },
+    "status": { "enum": ["draft", "running", "paused", "awaiting_user", "finishing", "completed", "failed"] },
+    "preview_override": { "type": "boolean" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "started_at": { "type": ["string", "null"], "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "state_version": { "type": "integer", "minimum": 0 },
+    "fact_brief_id": { "type": ["string", "null"], "pattern": "^FB-[0-9]{8}-[0-9]{3,}$" },
+    "active_generation": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["request_id", "turn_id", "state_version", "status", "started_at"],
+      "properties": {
+        "request_id": { "type": "string", "minLength": 1 },
+        "turn_id": { "type": "string", "pattern": "^RT-[0-9]{8}-[0-9]{3,}-T-[0-9]{4,}$" },
+        "state_version": { "type": "integer", "minimum": 0 },
+        "status": { "enum": ["running", "cancel_requested", "discarded"] },
+        "started_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "current": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section_index", "turn_index", "next_speaker", "question", "consensus", "disagreements", "pending_user_event_id"],
+      "properties": {
+        "section_index": { "type": "integer", "minimum": 0 },
+        "turn_index": { "type": "integer", "minimum": 0 },
+        "next_speaker": { "type": ["string", "null"] },
+        "question": { "type": "string", "minLength": 1 },
+        "consensus": { "type": "array", "items": { "type": "string" } },
+        "disagreements": { "type": "array", "items": { "type": "string" } },
+        "pending_claim_ids": { "type": "array", "items": { "type": "string" } },
+        "pending_user_event_id": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0",
+  "job": {
+    "id": "richard-feynman-web-001",
+    "created_by": "workspace-owner-with-codex",
+    "notes": "First real persona package; primary-source-heavy private research draft."
+  },
+  "subject": {
+    "person_id": "richard-feynman",
+    "display_name": "理查德·费曼",
+    "kind": "historical_public",
+    "aliases": ["Richard P. Feynman", "Richard Phillips Feynman", "R. P. Feynman"],
+    "identity_anchors": {
+      "active_years": "1918-1988",
+      "regions": ["United States", "Brazil", "United Kingdom"],
+      "fields": ["theoretical physics", "physics education", "scientific communication"],
+      "disambiguation_note": "MIT BSc 1939; Princeton PhD 1942; Cornell and Caltech physicist; 1965 Nobel laureate in physics."
+    }
+  },
+  "purpose": {
+    "goals": [
+      "培养以现象、模型、数量级、极限情况和实验检验为核心的物理思维",
+      "学习费曼处理困难问题、转换表示和发现自我欺骗的方法",
+      "以自然对话方式复盘物理学习、科研设计和技术判断"
+    ],
+    "target_capabilities": ["direct_chat", "roundtable", "story_simulation"],
+    "excluded_topics": ["冒充费曼本人", "伪造逐字名言", "替代专业医疗或法律意见"]
+  },
+  "input": {
+    "mode": "web",
+    "web": {
+      "languages": ["en", "zh"],
+      "max_sources": 80,
+      "seed_queries": [
+        "Richard Feynman oral history papers lectures scientific method",
+        "Richard Feynman original papers QED helium weak interaction computing",
+        "Richard Feynman teaching textbook review Challenger report",
+        "Richard Feynman legacy criticism myth biography"
+      ],
+      "seed_urls": [
+        "https://www.feynmanlectures.caltech.edu/",
+        "https://history.aip.org/catalog/icos/5020.html",
+        "https://www.nobelprize.org/prizes/physics/1965/feynman/lecture/",
+        "https://www.nasa.gov/history/rogersrep/v2appf.htm"
+      ],
+      "allowed_domains": [],
+      "blocked_domains": [],
+      "prefer_primary_sources": true
+    }
+  },
+  "privacy": {
+    "local_only": false,
+    "network_enabled": true,
+    "remote_processing_allowed": true,
+    "publish_visibility": "private",
+    "redact_third_parties": true,
+    "retain_raw_inputs": false
+  },
+  "quality": {
+    "minimum_independent_sources": 15,
+    "minimum_evidence_cards": 30,
+    "holdout_fraction": 0.2,
+    "require_human_publish_review": true
+  },
+  "output": {
+    "personas_directory": "..",
+    "target_level": "chat-ready",
+    "overwrite_existing": false
+  }
+}

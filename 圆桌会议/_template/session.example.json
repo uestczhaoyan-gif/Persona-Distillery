@@ -1,0 +1,35 @@
+{
+  "$schema": "../schemas/session.schema.json",
+  "schema_version": "1.0",
+  "protocol_version": "roundtable-runtime/0.1.0",
+  "session_id": "RT-20260806-001",
+  "title": "人应该怎样学习，才能形成自己的判断？",
+  "topic": "人应该怎样学习，才能形成自己的判断？",
+  "goal": "比较学习、换尺度、实验检验三种判断路径，保留真实分歧",
+  "participants": [
+    { "person_id": "kongzi", "display_name": "孔子", "package_version": "0.3.0", "adapter_version": "roundtable-adapter/0.1.0", "preview_override": true },
+    { "person_id": "zhuangzi", "display_name": "庄子", "package_version": "0.1.0", "adapter_version": "roundtable-adapter/0.1.0", "preview_override": true },
+    { "person_id": "richard-feynman", "display_name": "理查德·费曼", "package_version": "0.4.0", "adapter_version": "roundtable-adapter/0.1.0", "preview_override": true }
+  ],
+  "user_role": "observer",
+  "network_policy": "facts_only",
+  "limits": { "max_sections": 2, "max_turns": 6, "max_chars_per_turn": 2400, "no_new_claim_limit": 2 },
+  "status": "draft",
+  "preview_override": true,
+  "created_at": "2026-08-06T12:00:00+08:00",
+  "started_at": null,
+  "updated_at": "2026-08-06T12:00:00+08:00",
+  "state_version": 0,
+  "fact_brief_id": null,
+  "active_generation": null,
+  "current": {
+    "section_index": 0,
+    "turn_index": 0,
+    "next_speaker": "kongzi",
+    "question": "各自认为形成判断的第一步是什么？",
+    "consensus": [],
+    "disagreements": [],
+    "pending_claim_ids": [],
+    "pending_user_event_id": null
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "../schemas/turn.schema.json",
+  "schema_version": "1.0",
+  "turn_id": "RT-20260806-001-T-0001",
+  "session_id": "RT-20260806-001",
+  "sequence": 1,
+  "section_index": 0,
+  "speaker_id": "kongzi",
+  "text": "项目试验中的自然发言放在这里；这不是孔子原话。",
+  "responds_to": ["opening"],
+  "stance": "opening",
+  "basis": { "modes": ["simulation"], "evidence_ids": [], "source_ids": [], "fact_ids": [] },
+  "claims": [
+    { "claim_id": "C-0001", "text": "一个可观察的项目原创主张。", "novelty": "new", "responds_to_claim_id": null }
+  ],
+  "questions": [],
+  "needs_fact_check": false,
+  "moderation": { "accepted": true, "validation_notes": [], "stop_signal": "none" },
+  "created_at": "2026-08-06T12:01:00+08:00"
+}

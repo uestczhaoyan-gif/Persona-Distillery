@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/persona-distill/roundtable/schemas/turn.schema.json",
+  "title": "Roundtable turn",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "turn_id", "session_id", "sequence", "section_index", "speaker_id", "text", "responds_to", "stance", "basis", "claims", "questions", "moderation", "created_at"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema_version": { "const": "1.0" },
+    "turn_id": { "type": "string", "pattern": "^RT-[0-9]{8}-[0-9]{3,}-T-[0-9]{4,}$" },
+    "session_id": { "type": "string", "pattern": "^RT-[0-9]{8}-[0-9]{3,}$" },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "section_index": { "type": "integer", "minimum": 0 },
+    "speaker_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$" },
+    "text": { "type": "string", "minLength": 1, "maxLength": 20000 },
+    "responds_to": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "stance": { "enum": ["opening", "support", "challenge", "clarify", "revise", "synthesize", "defer"] },
+    "basis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["modes", "evidence_ids", "source_ids", "fact_ids"],
+      "properties": {
+        "modes": { "type": "array", "minItems": 1, "items": { "enum": ["direct", "inference", "simulation"] } },
+        "evidence_ids": { "type": "array", "items": { "type": "string", "pattern": "^E-[0-9]{4}$" } },
+        "source_ids": { "type": "array", "items": { "type": "string", "pattern": "^P-[0-9]{4}-[0-9]{3}$" } },
+        "fact_ids": { "type": "array", "items": { "type": "string", "pattern": "^F-[0-9]{4}$" } }
+      }
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim_id", "text", "novelty"],
+        "properties": {
+          "claim_id": { "type": "string", "pattern": "^C-[0-9]{4,}$" },
+          "text": { "type": "string", "minLength": 1 },
+          "novelty": { "enum": ["new", "reframed", "repeated", "withdrawn"] },
+          "responds_to_claim_id": { "type": ["string", "null"], "pattern": "^C-[0-9]{4,}$" }
+        }
+      }
+    },
+    "questions": { "type": "array", "items": { "type": "string" } },
+    "needs_fact_check": { "type": "boolean", "default": false },
+    "moderation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accepted", "validation_notes", "stop_signal"],
+      "properties": {
+        "accepted": { "type": "boolean" },
+        "validation_notes": { "type": "array", "items": { "type": "string" } },
+        "stop_signal": { "enum": ["none", "section_ready", "session_ready", "risk", "needs_user", "needs_fact_check"] }
+      }
+    },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}

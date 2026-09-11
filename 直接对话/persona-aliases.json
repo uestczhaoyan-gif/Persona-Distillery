@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "aliases": {
+    "孔子": "kongzi",
+    "confucius": "kongzi",
+    "鲁迅": "lu-xun",
+    "luxun": "lu-xun",
+    "费曼": "richard-feynman",
+    "理查德·费曼": "richard-feynman",
+    "feynman": "richard-feynman",
+    "庄子": "zhuangzi"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0",
+  "person_id": "richard-feynman",
+  "package_version": "0.4.0",
+  "built_on": "2026-08-04",
+  "canonical_inputs": {
+    "sources": "../../01-sources.csv",
+    "evidence_review": "../../02-evidence.md",
+    "chunks": "../chunks.jsonl",
+    "evidence": "../evidence.jsonl",
+    "context_review": "../../08-context-memory.md",
+    "context_memory": "../context-memory.jsonl"
+  },
+  "records": {
+    "sources": 67,
+    "chunks": 57,
+    "evidence": 40,
+    "context_memory": 70,
+    "search_rows": 167
+  },
+  "full_text_index": {
+    "path": "memory.sqlite3",
+    "engine": "SQLite FTS5",
+    "tokenizer": "trigram"
+  },
+  "vector_index": {
+    "path": "vectors.npy",
+    "records": "records.jsonl",
+    "method": "hashed-char-ngram-v1",
+    "dimensions": 4096,
+    "dtype": "float32",
+    "normalized": true,
+    "semantic_embeddings": false,
+    "note": "Deterministic offline lexical vectors; rebuild with an embedding provider for semantic retrieval."
+  },
+  "checksums": {
+    "sources_sha256": "029432323131ce086fd71236b93e3ba2782a4f40e4877a4b9de1730964c2806f",
+    "evidence_markdown_sha256": "ec5a7627fbbd724ba592d7656c2d9956a229cb0554c9ac27b713df18597439a8",
+    "chunks_jsonl_sha256": "b4b56a15446198c095de8162e17c7736c50324f552ece72d898f639970c9f686",
+    "evidence_jsonl_sha256": "a59e217ed809e182ed82c9f058c2c90d7e93a29395b622654883017fb091d85b",
+    "context_markdown_sha256": "51cf270399d02ab272da069b00167b0140ade372e53f6ee10d1321f890be10db",
+    "context_jsonl_sha256": "1f977646975849caebc58cb59b59c560b45384b4af055bfb3d270b62db399cac"
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0",
+  "job": {
+    "id": "zhuangzi-web-001",
+    "created_by": "workspace-owner-with-codex",
+    "notes": "Fourth persona experiment; preserve textual plurality and test a playful, perspective-shifting historical-native voice without reducing Zhuangzi to relativism or passive withdrawal."
+  },
+  "subject": {
+    "person_id": "zhuangzi",
+    "display_name": "庄子",
+    "kind": "historical_public",
+    "aliases": ["庄周", "南华真人", "Master Zhuang", "Zhuang Zhou", "Chuang Tzu"],
+    "identity_anchors": {
+      "active_years": "约前4世纪中后期；传统生卒年说法不一",
+      "regions": ["宋之蒙（传统记载，具体地点有争议）", "战国中原与楚文化交界的思想环境"],
+      "fields": ["哲学", "文学", "语言与认识", "生命实践", "政治批评"],
+      "disambiguation_note": "本包区分历史庄周、以内篇为核心的庄子思想、外杂篇多种学派声音、郭象编本与后世道教/文学接受。"
+    }
+  },
+  "purpose": {
+    "goals": [
+      "帮助用户松动被单一尺度、固定名目和他人眼光锁死的问题",
+      "以寓言、反例、尺度转换和具体技艺重新打开选择，而不是给出万能相对主义",
+      "保留庄子对语言、知识、死亡、政治参与和身体差异的内部张力"
+    ],
+    "target_capabilities": ["direct_chat", "themed_lecture"],
+    "excluded_topics": ["冒充历史庄周本人", "把全书三十三篇都归为庄周亲作", "伪造寓言或逐字引语", "用顺其自然为现实伤害和消极放弃背书"]
+  },
+  "input": {
+    "mode": "web",
+    "web": {
+      "languages": ["zh", "en"],
+      "max_sources": 70,
+      "seed_queries": [
+        "庄子 内篇 外篇 杂篇 中国哲学书电子化计划",
+        "史记 老子韩非列传 庄周 漆园吏",
+        "荀子 解蔽 庄子蔽于天而不知人",
+        "Zhuangzi textual layers inner chapters skepticism skill Stanford Encyclopedia"
+      ],
+      "seed_urls": [
+        "https://ctext.org/zhuangzi/zh",
+        "https://ctext.org/shiji/lao-zi-han-fei-lie-zhuan/zhs",
+        "https://ctext.org/xunzi/jie-bi/zh",
+        "https://plato.stanford.edu/archives/win2025/entries/zhuangzi/"
+      ],
+      "allowed_domains": [],
+      "blocked_domains": [],
+      "prefer_primary_sources": true
+    }
+  },
+  "privacy": {
+    "local_only": false,
+    "network_enabled": true,
+    "remote_processing_allowed": true,
+    "publish_visibility": "private",
+    "redact_third_parties": true,
+    "retain_raw_inputs": false
+  },
+  "quality": {
+    "minimum_independent_sources": 8,
+    "minimum_evidence_cards": 40,
+    "holdout_fraction": 0.2,
+    "require_human_publish_review": true
+  },
+  "output": {
+    "personas_directory": "..",
+    "target_level": "chat-ready",
+    "overwrite_existing": false
+  }
+}

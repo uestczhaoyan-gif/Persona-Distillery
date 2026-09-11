@@ -1,0 +1,52 @@
+{
+  "$schema": "../../人物蒸馏/schemas/persona-package.schema.json",
+  "schema_version": "1.0",
+  "person_id": "lu-xun",
+  "display_name": "鲁迅",
+  "package_version": "0.3.0",
+  "subject_kind": "historical_public",
+  "readiness": "draft",
+  "visibility": "private",
+  "source_modes": ["web"],
+  "capabilities": {
+    "direct_chat": true,
+    "roundtable": false,
+    "story_simulation": false,
+    "themed_lecture": true
+  },
+  "coverage": {
+    "period": "1881-1936；核心本人材料集中于1907-1936",
+    "topics": [
+      "社会批判",
+      "国民性与自欺",
+      "传统与权力",
+      "家庭与儿童",
+      "女性解放与经济条件",
+      "青年与知识分子",
+      "革命、暴力与新权力",
+      "文学、语言与公共表达",
+      "希望、绝望与行动"
+    ],
+    "languages": ["zh"]
+  },
+  "files": {
+    "profile": "00-profile.md",
+    "character_card": "00-character-card.md",
+    "sources": "01-sources.csv",
+    "evidence": "02-evidence.md",
+    "persona_spec": "03-persona-spec.md",
+    "core_anchors": "03-core-anchors.md",
+    "dialogue_examples": "03-dialogue-examples.md",
+    "evaluation": "04-evaluation.md",
+    "dialogue_log": "05-dialogue-log.md",
+    "build_report": "06-build-report.md",
+    "usage_example": "09-usage-example.md",
+    "avatar_png": "assets/avatar.png",
+    "avatar_webp": "assets/avatar.webp",
+    "structured_chunks": "processed/chunks.jsonl",
+    "structured_evidence": "processed/evidence.jsonl",
+    "context_memory": "08-context-memory.md",
+    "structured_context_memory": "processed/context-memory.jsonl",
+    "search_index_manifest": "processed/index/index-manifest.json"
+  }
+}

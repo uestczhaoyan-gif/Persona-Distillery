@@ -1,0 +1,9 @@
+{
+  "$schema": "../../../人物蒸馏/schemas/local-research-overlay.schema.json",
+  "schema_version": "1.0",
+  "person_id": "richard-feynman",
+  "default_channel": "local_only",
+  "remote_agent": { "enabled": false, "allowed_channels": ["public"], "raw_text_allowed": false, "provider_note": "Protected texts remain local by default." },
+  "paths": { "sources": "sources.local.csv", "raw": "raw/", "chunks": "processed/chunks.local.jsonl", "evidence": "processed/evidence.local.jsonl" },
+  "operator_confirmation": { "rights_reviewed": false, "privacy_reviewed": false, "reviewed_on": null }
+}

@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0",
+  "job": {
+    "id": "example-private-upload-001",
+    "created_by": "local-user",
+    "notes": "Private upload example; keep incoming files outside Git."
+  },
+  "subject": {
+    "person_id": "example-private-mentor",
+    "display_name": "示例导师代号",
+    "kind": "living_private",
+    "aliases": [],
+    "identity_anchors": {
+      "active_years": "<资料覆盖年代>",
+      "regions": [],
+      "fields": ["<领域>"],
+      "disambiguation_note": "仅使用代号；不要在公开配置中填写真实私人身份。"
+    }
+  },
+  "purpose": {
+    "goals": [
+      "在本人授权范围内整理其指导问题和复盘决策的方法"
+    ],
+    "target_capabilities": ["direct_chat"],
+    "excluded_topics": ["私人关系", "健康", "财务"]
+  },
+  "input": {
+    "mode": "upload",
+    "upload": {
+      "incoming_directory": "../runs/example-private-upload-001/incoming",
+      "participant_map_file": "../runs/example-private-upload-001/participant-map.private.json",
+      "allow_ocr": true,
+      "allow_transcription": false
+    }
+  },
+  "consent": {
+    "status": "pending",
+    "record_file": "../runs/example-private-upload-001/consent.private.md"
+  },
+  "privacy": {
+    "local_only": true,
+    "network_enabled": false,
+    "remote_processing_allowed": false,
+    "publish_visibility": "private",
+    "redact_third_parties": true,
+    "retain_raw_inputs": true
+  },
+  "quality": {
+    "minimum_independent_sources": 3,
+    "minimum_evidence_cards": 20,
+    "holdout_fraction": 0.2,
+    "require_human_publish_review": true
+  },
+  "output": {
+    "personas_directory": "../../personas",
+    "target_level": "draft",
+    "overwrite_existing": false
+  }
+}

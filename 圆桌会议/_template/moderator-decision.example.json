@@ -1,0 +1,10 @@
+{
+  "$schema": "../schemas/moderator-decision.schema.json",
+  "schema_version": "1.0",
+  "action": "speak",
+  "next_speaker": "kongzi",
+  "responds_to": ["opening"],
+  "instruction": "提出形成判断的初步看法，并说明学习如何落到行为。",
+  "reason": "当前为开场，孔子尚未形成初始立场。",
+  "stop_signal": "none"
+}

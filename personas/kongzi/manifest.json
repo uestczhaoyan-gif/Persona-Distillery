@@ -1,0 +1,50 @@
+{
+  "$schema": "../../人物蒸馏/schemas/persona-package.schema.json",
+  "schema_version": "1.0",
+  "person_id": "kongzi",
+  "display_name": "孔子",
+  "package_version": "0.3.0",
+  "subject_kind": "historical_public",
+  "readiness": "draft",
+  "visibility": "private",
+  "source_modes": ["web"],
+  "capabilities": {
+    "direct_chat": true,
+    "roundtable": false,
+    "story_simulation": false,
+    "themed_lecture": true
+  },
+  "coverage": {
+    "period": "约前551—前479；思想材料主要见于战国以前后编纂的早期文献",
+    "topics": [
+      "仁与关系中的自我修养",
+      "礼、习惯与公共秩序",
+      "学习、教人与因材施教",
+      "正名、政治与责任",
+      "孝、家庭与边界",
+      "贫困、尊严与君子",
+      "朋友、忠恕与冲突",
+      "古典传统与现实修正",
+      "人物的历史层次与后世塑造"
+    ],
+    "languages": ["zh", "en"]
+  },
+  "files": {
+    "profile": "00-profile.md",
+    "character_card": "00-character-card.md",
+    "sources": "01-sources.csv",
+    "evidence": "02-evidence.md",
+    "persona_spec": "03-persona-spec.md",
+    "core_anchors": "03-core-anchors.md",
+    "dialogue_examples": "03-dialogue-examples.md",
+    "evaluation": "04-evaluation.md",
+    "dialogue_log": "05-dialogue-log.md",
+    "build_report": "06-build-report.md",
+    "usage_example": "09-usage-example.md",
+    "context_memory": "08-context-memory.md",
+    "structured_chunks": "processed/chunks.jsonl",
+    "structured_evidence": "processed/evidence.jsonl",
+    "structured_context_memory": "processed/context-memory.jsonl",
+    "search_index_manifest": "processed/index/index-manifest.json"
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/persona-distill/roundtable/schemas/article.schema.json",
+  "title": "Edited roundtable article",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "session_id", "title", "simulation_notice", "background", "development", "consensus", "disagreements", "open_questions", "source_turn_ids", "editorial_notes"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema_version": { "const": "1.0" },
+    "session_id": { "type": "string", "pattern": "^RT-[0-9]{8}-[0-9]{3,}$" },
+    "title": { "type": "string", "minLength": 1 },
+    "simulation_notice": { "type": "string", "minLength": 1 },
+    "background": { "type": "string", "minLength": 1 },
+    "development": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["heading", "body", "turn_ids"],
+        "properties": {
+          "heading": { "type": "string", "minLength": 1 },
+          "body": { "type": "string", "minLength": 1 },
+          "turn_ids": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^RT-[0-9]{8}-[0-9]{3,}-T-[0-9]{4,}$" } }
+        }
+      }
+    },
+    "consensus": { "type": "array", "items": { "type": "string" } },
+    "disagreements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["summary", "participants", "turn_ids"],
+        "properties": {
+          "summary": { "type": "string", "minLength": 1 },
+          "participants": { "type": "array", "minItems": 2, "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$" } },
+          "turn_ids": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^RT-[0-9]{8}-[0-9]{3,}-T-[0-9]{4,}$" } }
+        }
+      }
+    },
+    "open_questions": { "type": "array", "items": { "type": "string" } },
+    "source_turn_ids": { "type": "array", "items": { "type": "string", "pattern": "^RT-[0-9]{8}-[0-9]{3,}-T-[0-9]{4,}$" } },
+    "editorial_notes": { "type": "array", "items": { "type": "string" } }
+  }
+}

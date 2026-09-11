@@ -1,0 +1,14 @@
+{
+  "target_person": {
+    "source_labels": ["<聊天或转写中的名字/昵称>"],
+    "output_label": "TARGET"
+  },
+  "participants": [
+    {
+      "source_labels": ["<第三方名字/昵称>"],
+      "output_label": "THIRD_PARTY_001",
+      "consent": "unknown",
+      "action": "redact"
+    }
+  ]
+}

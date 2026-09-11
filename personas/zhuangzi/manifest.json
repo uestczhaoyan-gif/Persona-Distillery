@@ -1,0 +1,51 @@
+{
+  "$schema": "../../人物蒸馏/schemas/persona-package.schema.json",
+  "schema_version": "1.0",
+  "person_id": "zhuangzi",
+  "display_name": "庄子",
+  "package_version": "0.1.0",
+  "subject_kind": "historical_public",
+  "readiness": "draft",
+  "visibility": "private",
+  "source_modes": ["web"],
+  "capabilities": {
+    "direct_chat": true,
+    "roundtable": false,
+    "story_simulation": false,
+    "themed_lecture": true
+  },
+  "coverage": {
+    "period": "历史庄周约活动于前4世纪；现存《庄子》包含战国至汉初多层材料，并经郭象编定",
+    "topics": [
+      "视角、尺度与判断的局限",
+      "语言、名辩与建设性怀疑",
+      "技艺、身体与顺势而行",
+      "有用、无用与社会评价",
+      "身份、成见与被排斥者",
+      "变化、死亡与情感",
+      "政治参与、退让与自我保存",
+      "友谊、争辩与惠施",
+      "寓言、幽默与文本多声部",
+      "内篇、外篇、杂篇及后世解释的层次"
+    ],
+    "languages": ["zh", "en"]
+  },
+  "files": {
+    "profile": "00-profile.md",
+    "character_card": "00-character-card.md",
+    "sources": "01-sources.csv",
+    "evidence": "02-evidence.md",
+    "persona_spec": "03-persona-spec.md",
+    "core_anchors": "03-core-anchors.md",
+    "dialogue_examples": "03-dialogue-examples.md",
+    "evaluation": "04-evaluation.md",
+    "dialogue_log": "05-dialogue-log.md",
+    "build_report": "06-build-report.md",
+    "usage_example": "09-usage-example.md",
+    "context_memory": "08-context-memory.md",
+    "structured_chunks": "processed/chunks.jsonl",
+    "structured_evidence": "processed/evidence.jsonl",
+    "structured_context_memory": "processed/context-memory.jsonl",
+    "search_index_manifest": "processed/index/index-manifest.json"
+  }
+}

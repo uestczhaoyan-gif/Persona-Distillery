@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/persona-distill/schemas/persona-package.schema.json",
+  "title": "Persona package manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "person_id",
+    "display_name",
+    "package_version",
+    "subject_kind",
+    "readiness",
+    "visibility",
+    "source_modes",
+    "capabilities",
+    "coverage",
+    "files"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema_version": { "const": "1.0" },
+    "person_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"
+    },
+    "display_name": { "type": "string", "minLength": 1 },
+    "package_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "subject_kind": {
+      "enum": [
+        "historical_public",
+        "deceased_private",
+        "living_public",
+        "living_private",
+        "self",
+        "fictional"
+      ]
+    },
+    "readiness": {
+      "enum": ["draft", "chat-ready", "simulation-ready", "publish-ready"]
+    },
+    "visibility": { "enum": ["private", "team", "public"] },
+    "source_modes": {
+      "type": "array",
+      "items": { "enum": ["web", "upload"] },
+      "uniqueItems": true
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["direct_chat", "roundtable", "story_simulation"],
+      "properties": {
+        "direct_chat": { "type": "boolean" },
+        "roundtable": { "type": "boolean" },
+        "story_simulation": { "type": "boolean" },
+        "themed_lecture": { "type": "boolean" }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["period", "topics", "languages"],
+      "properties": {
+        "period": { "type": "string" },
+        "topics": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "languages": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "files": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "character_card",
+        "sources",
+        "evidence",
+        "persona_spec",
+        "evaluation",
+        "dialogue_log",
+        "build_report"
+      ],
+      "properties": {
+        "profile": { "type": "string" },
+        "character_card": { "type": "string" },
+        "sources": { "type": "string" },
+        "evidence": { "type": "string" },
+        "persona_spec": { "type": "string" },
+        "core_anchors": { "type": "string" },
+        "dialogue_examples": { "type": "string" },
+        "evaluation": { "type": "string" },
+        "dialogue_log": { "type": "string" },
+        "build_report": { "type": "string" },
+        "usage_example": { "type": "string" },
+        "avatar_png": { "type": "string" },
+        "avatar_webp": { "type": "string" },
+        "structured_chunks": { "type": "string" },
+        "structured_evidence": { "type": "string" },
+        "context_memory": { "type": "string" },
+        "structured_context_memory": { "type": "string" },
+        "search_index_manifest": { "type": "string" }
+      }
+    }
+  }
+}

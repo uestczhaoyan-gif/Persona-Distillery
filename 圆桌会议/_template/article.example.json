@@ -1,0 +1,16 @@
+{
+  "$schema": "../schemas/article.schema.json",
+  "schema_version": "1.0",
+  "session_id": "RT-20260806-001",
+  "title": "项目原创讨论稿标题",
+  "simulation_notice": "这是基于人物材料构建的视角模拟，不是历史记录或真实发言。",
+  "background": "项目原创背景说明。",
+  "development": [
+    { "heading": "第一处分歧", "body": "只概括已经发生的回合。", "turn_ids": ["RT-20260806-001-T-0001"] }
+  ],
+  "consensus": [],
+  "disagreements": [],
+  "open_questions": ["下一步还要核对什么？"],
+  "source_turn_ids": ["RT-20260806-001-T-0001"],
+  "editorial_notes": ["此文件是结构示例。"]
+}

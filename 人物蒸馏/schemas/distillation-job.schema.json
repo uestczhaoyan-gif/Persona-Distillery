@@ -1,0 +1,381 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/persona-distill/schemas/distillation-job.schema.json",
+  "title": "Persona distillation job",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "job",
+    "subject",
+    "purpose",
+    "input",
+    "privacy",
+    "quality",
+    "output"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "job": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "created_by"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"
+        },
+        "created_by": {
+          "type": "string",
+          "minLength": 1
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["person_id", "display_name", "kind"],
+      "properties": {
+        "person_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "historical_public",
+            "deceased_private",
+            "living_public",
+            "living_private",
+            "self",
+            "fictional"
+          ]
+        },
+        "aliases": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "identity_anchors": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "active_years": { "type": "string" },
+            "regions": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "fields": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "disambiguation_note": { "type": "string" }
+          }
+        }
+      }
+    },
+    "purpose": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["goals", "target_capabilities"],
+      "properties": {
+        "goals": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "target_capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["direct_chat", "roundtable", "story_simulation", "themed_lecture"]
+          }
+        },
+        "excluded_topics": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "enum": ["web", "upload"]
+        },
+        "web": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["languages", "max_sources"],
+          "properties": {
+            "languages": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string" }
+            },
+            "max_sources": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "seed_queries": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "seed_urls": {
+              "type": "array",
+              "items": { "type": "string", "format": "uri" }
+            },
+            "allowed_domains": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "blocked_domains": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "prefer_primary_sources": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        },
+        "upload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["incoming_directory"],
+          "properties": {
+            "incoming_directory": {
+              "type": "string",
+              "minLength": 1
+            },
+            "participant_map_file": {
+              "type": "string"
+            },
+            "allow_ocr": {
+              "type": "boolean",
+              "default": true
+            },
+            "allow_transcription": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "mode": { "const": "web" } },
+            "required": ["mode"]
+          },
+          "then": { "required": ["web"] }
+        },
+        {
+          "if": {
+            "properties": { "mode": { "const": "upload" } },
+            "required": ["mode"]
+          },
+          "then": { "required": ["upload"] }
+        }
+      ]
+    },
+    "consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "record_file"],
+      "properties": {
+        "status": {
+          "enum": ["not_applicable", "pending", "granted", "denied"]
+        },
+        "record_file": {
+          "type": "string"
+        },
+        "expires_on": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "local_only",
+        "network_enabled",
+        "remote_processing_allowed",
+        "publish_visibility",
+        "redact_third_parties"
+      ],
+      "properties": {
+        "local_only": { "type": "boolean" },
+        "network_enabled": { "type": "boolean" },
+        "remote_processing_allowed": { "type": "boolean" },
+        "publish_visibility": {
+          "enum": ["private", "team", "public"]
+        },
+        "redact_third_parties": { "type": "boolean" },
+        "retain_raw_inputs": { "type": "boolean", "default": true }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimum_independent_sources",
+        "minimum_evidence_cards",
+        "holdout_fraction",
+        "require_human_publish_review"
+      ],
+      "properties": {
+        "minimum_independent_sources": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum_evidence_cards": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "holdout_fraction": {
+          "type": "number",
+          "minimum": 0.05,
+          "maximum": 0.5
+        },
+        "require_human_publish_review": {
+          "const": true
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["personas_directory", "target_level"],
+      "properties": {
+        "personas_directory": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_level": {
+          "enum": ["draft", "chat-ready", "simulation-ready", "publish-ready"]
+        },
+        "overwrite_existing": {
+          "const": false
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "subject": {
+            "properties": {
+              "kind": { "enum": ["living_public", "living_private", "self"] }
+            },
+            "required": ["kind"]
+          }
+        }
+      },
+      "then": { "required": ["consent"] }
+    },
+    {
+      "if": {
+        "properties": {
+          "input": {
+            "properties": { "mode": { "const": "upload" } },
+            "required": ["mode"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "privacy": {
+            "properties": {
+              "redact_third_parties": { "const": true }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "input": {
+            "properties": { "mode": { "const": "web" } },
+            "required": ["mode"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "privacy": {
+            "properties": {
+              "network_enabled": { "const": true }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "privacy": {
+            "properties": { "local_only": { "const": true } },
+            "required": ["local_only"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "privacy": {
+            "properties": {
+              "remote_processing_allowed": { "const": false },
+              "publish_visibility": { "const": "private" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "subject": {
+            "properties": {
+              "kind": { "enum": ["living_public", "living_private", "self"] }
+            },
+            "required": ["kind"]
+          },
+          "privacy": {
+            "properties": {
+              "publish_visibility": { "const": "public" }
+            },
+            "required": ["publish_visibility"]
+          }
+        }
+      },
+      "then": {
+        "required": ["consent"],
+        "properties": {
+          "consent": {
+            "properties": {
+              "status": { "const": "granted" }
+            },
+            "required": ["status"]
+          }
+        }
+      }
+    }
+  ]
+}
