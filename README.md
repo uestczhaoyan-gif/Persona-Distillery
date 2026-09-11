@@ -1,71 +1,63 @@
-# 人物蒸馏实验室 / Persona Distillation Lab
+# Persona-Distillery · 人物蒸馏实验室
 
-基于可追溯证据的人物视角研究与对话系统。它整理公开材料中的知识、语言、价值取向和决策方法，帮助模型以某人物的研究型视角思考；不冒充人物本人，也不替人物表达现实立场。
+**中文** | [English](README.en.md)
 
-An evidence-grounded research and dialogue system for character perspectives. It organizes knowledge, language, values, and decision methods from public sources so an AI can reason through a research-based persona perspective. It does not impersonate a real person or represent their current views.
+从公开材料中整理人物的知识、表达、价值取向与判断方法，构建有来源可查的研究型人物视角。通过支持读取工作区的 AI Agent，与孔子、庄子、鲁迅或理查德·费曼的研究型视角对话，并追问回答依据与推演边界。
 
-## 当前版本 / Current release
+这是基于材料的视角模拟，不是人物本人，也不代表其现实立场。
 
-`v0.1.0` 研究预览 / research preview. 已包含四个人物包：孔子、庄子、鲁迅、理查德·费曼。人物包目前仍是 `draft/private`，Agent 直读和结构化资料可用于维护者本地预览；独立 CLI、Web、圆桌运行时、故事分支和语音仍在开发中。
+## 当前能力
 
-Includes four persona packages: Confucius, Zhuangzi, Lu Xun, and Richard Feynman. Packages are still `draft/private`; Agent direct-read mode and structured research data are available for local maintainer preview. CLI, Web, roundtable runtime, story branching, and voice output are not implemented yet.
+当前为 **v0.1.0 研究预览**，包含孔子、庄子、鲁迅、理查德·费曼四个人物包。
 
-## 快速开始 / Quick start
+- 整理来源、证据、结构化记忆、情境与评测资料。
+- 通过 Agent 直读流程加载材料，进行单人人物视角对话。
+- 使用别名解析器生成加载计划，检查人物入口与资料路径。
 
-在 Codex 或其他能读取工作区文件的 Agent 中打开仓库根目录：
+人物包仍为 draft/private，供已有授权的维护者本地只读预览。独立 CLI、Web 服务、圆桌运行时、故事分支和语音输出尚未实现；相关设计与模板不等于可运行产品。
 
-Open the repository root in Codex or another workspace-aware Agent:
+## 快速开始
+
+在能读取工作区的 Agent 中打开仓库根目录，发送：
 
 ```text
 /孔子 我读了很多书，却还是不会判断事情。
 ```
 
-其他入口 / Other entries: `/庄子`、`/鲁迅`、`/费曼`、`/persona kongzi`、`人物 孔子`。若客户端拦截斜杠命令，使用 `人物 孔子`。这些是项目文本入口，不是客户端内置命令。
+其他入口包括 /庄子、/鲁迅、/费曼、/persona kongzi。这些是项目文本约定，不是客户端内置命令。若客户端拦截斜杠，发送“人物 孔子”；未自动读取项目指令时，先让 Agent 读取 AGENTS.md。
 
-Other entries: `/庄子`, `/鲁迅`, `/费曼`, `/persona kongzi`, or `人物 孔子`. If the host intercepts slash commands, use `人物 孔子`. These are project conventions, not built-in client commands.
+首次草稿预览需要维护者授权；已有会话或本地授权无需重复确认。克隆仓库不会继承他人的授权。流程、切换与退出方式见[使用方法](直接对话/使用方法.md)和[命令入口](直接对话/命令入口.md)。对话使用当前 Agent 的模型；加载计划解析器本身不调用模型，也不会独立开启聊天。
 
-入口规则、预览授权和切换方式见 [直接对话/使用方法](直接对话/使用方法.md) 与 [命令入口](直接对话/命令入口.md)。
+## 项目结构
 
-See [direct dialogue usage](直接对话/使用方法.md) and [persona commands](直接对话/命令入口.md) for routing, preview authorization, and switching.
+| 目录 | 内容 |
+| --- | --- |
+| personas/ | 人物来源、证据、记忆、评测、manifest 与索引 |
+| 人物蒸馏/ | 来源处理协议、Schema 与结构化记忆工具 |
+| 直接对话/ | 人物入口、加载计划解析器与 Agent 回答契约 |
+| 圆桌会议/、故事推演/、定题演讲/ | 后续能力的协议、设计与模板 |
+| docs/ | 架构、治理、视觉规范与贡献指南 |
 
-## 项目结构 / Project structure
+详见[项目结构与贡献指南](docs/03-项目结构与贡献指南.md)和[版本说明](RELEASE.md)。
 
-- `personas/`：人物来源、证据、情境记忆、评测和索引 / sources, evidence, context memory, evaluations, and indexes.
-- `人物蒸馏/`：来源处理协议、Schema 和构建工具 / source processing protocols, schemas, and build tools.
-- `直接对话/`：人物快捷入口、Agent 契约和未来 CLI 设计 / persona routing, Agent contract, and future CLI design.
-- `圆桌会议/`、`故事推演/`、`定题演讲/`：后续功能协议和模板 / protocols and templates for later features.
-- `docs/`：治理、架构、视觉和贡献指南 / governance, architecture, visual rules, and contribution guide.
+## 证据与使用边界
 
-详见 [项目结构与贡献指南](docs/03-项目结构与贡献指南.md)。
+- 事实、原话与经历须能回溯到来源；区分证据、解释与模拟推演，材料不足时说明不确定性。
+- 公开资料包不包含受版权保护的完整原文、私密上传、未脱敏聊天或 API 密钥。
+- 默认只读，不保存完整私聊；仅在要求核验或事实缺口实质影响判断时使用网络查询。
+- 仓库公开不改变人物包的预览状态，也不代表第三方人物材料或图片可自由再利用。
 
-See [project structure and contribution guide](docs/03-项目结构与贡献指南.md).
+## 开发验证
 
-## 设计边界 / Boundaries
-
-- 重要事实、原话和经历必须可回溯到来源；材料不足时承认不确定性。
-- Historical facts, quotations, and experiences must remain traceable; uncertainty is stated when evidence is insufficient.
-- 公开薄包不包含受版权保护的原文、私密上传、未脱敏聊天或 API 密钥。
-- Public packages exclude copyrighted full text, private uploads, unredacted chats, and API keys.
-- 默认只读、不开启网络；需要当前事实核验时才建立临时事实简报。
-- Default operation is read-only with no web request; current facts are checked only when needed.
-
-## 验证 / Verification
+入口解析器需要 Python 3.10+，仅使用标准库。在仓库根目录运行：
 
 ```powershell
 python -m unittest discover -s tests -v
 python 直接对话/scripts/resolve_persona.py --list
 ```
 
-人物结构化记忆校验需要 NumPy 环境，命令见各人物构建报告。
+结构化记忆构建与校验另需 NumPy，命令见各人物构建报告。测试通过不等于对话质量已验证，仍需独立题目与人工评测。
 
-Structured-memory validation requires an environment with NumPy; see each persona build report for the command.
+## 许可证
 
-## 许可证 / License
-
-仓库当前尚未选择统一许可证。发布到 GitHub 前请由项目所有者确定代码、文档、人物资料和图片分别适用的许可证；在此之前请勿将仓库标记为可自由再利用。
-
-This repository does not yet have a single chosen license. Before publishing on GitHub, the project owner should decide licenses for code, documentation, persona data, and images separately. Until then, do not present the repository as freely reusable.
-
-English version: [README.en.md](README.en.md)
-License: [MIT](LICENSE) for project code and original documentation; persona materials and images may have separate rights.
-
+项目代码和原创文档使用 [MIT 许可证](LICENSE)。第三方人物资料、引用和图片可能具有独立权利限制，应按各自来源和授权使用。
