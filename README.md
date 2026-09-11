@@ -1,87 +1,71 @@
-# 人物蒸馏实验室
+# 人物蒸馏实验室 / Persona Distillation Lab
 
-这是一个长期维护的"人物视角研究与对话系统"。它研究的不是把一个人神秘地"复制"出来，而是：在明确来源、时间与不确定性的前提下，整理人物可观察到的知识、语言习惯、价值取向与决策框架，并把它们做成可检索、可评测、可对话的数字档案。
+基于可追溯证据的人物视角研究与对话系统。它整理公开材料中的知识、语言、价值取向和决策方法，帮助模型以某人物的研究型视角思考；不冒充人物本人，也不替人物表达现实立场。
 
-一句话定位：**让模型以某人物的、可追溯的视角帮助思考；不冒充其本人，也不替其表达现实立场。**
+An evidence-grounded research and dialogue system for character perspectives. It organizes knowledge, language, values, and decision methods from public sources so an AI can reason through a research-based persona perspective. It does not impersonate a real person or represent their current views.
 
-## 先做什么
+## 当前版本 / Current release
 
-当前已有孔子、庄子、鲁迅和费曼四个人物包，处于研究预览阶段。新增人物建议一次只做一个，优先选择以下两类之一：
+`v0.1.0` 研究预览 / research preview. 已包含四个人物包：孔子、庄子、鲁迅、理查德·费曼。人物包目前仍是 `draft/private`，Agent 直读和结构化资料可用于维护者本地预览；独立 CLI、Web、圆桌运行时、故事分支和语音仍在开发中。
 
-1. 已故的公共人物，且有较丰富、合法可用的公开一手材料；
-2. 明确授权、愿意参与校对的在世人物。
+Includes four persona packages: Confucius, Zhuangzi, Lu Xun, and Richard Feynman. Packages are still `draft/private`; Agent direct-read mode and structured research data are available for local maintainer preview. CLI, Web, roundtable runtime, story branching, and voice output are not implemented yet.
 
-第一版不要训练专属模型。先采用"结构化人物记忆 + 人物视角规范 + 原创对话示例 + 可选检索工具"。小型人物包可以整体读入，让模型形成连贯的记忆与人物倾向；资料变大后再让模型按需检索，而不是把每轮对话固定成 RAG 流水线。**前台默认是自然聊天：证据用于约束历史事实和按需审计，不要求每个推理或回答都有单独出处。** 等人物体验、评测和使用场景成熟后，再判断是否需要真正的模型微调。
+## 快速开始 / Quick start
 
-用 Codex 打开仓库根目录并新建任务，即可发送 `/孔子`；若客户端拦截未知斜杠命令，发送 `人物 孔子`。也可直接带上问题：
+在 Codex 或其他能读取工作区文件的 Agent 中打开仓库根目录：
+
+Open the repository root in Codex or another workspace-aware Agent:
 
 ```text
 /孔子 我读了很多书，却还是不会判断事情。
 ```
 
-另有 `/庄子`、`/鲁迅`、`/费曼`；`/人物` 查看清单，`/退出` 恢复普通助手。它们是项目文本入口，不是客户端原生命令。四个人物仍为 `draft/private`，本地已有预览授权可复用；新维护者首次使用需确认只读预览。见 [直接对话使用方法](直接对话/使用方法.md)。
+其他入口 / Other entries: `/庄子`、`/鲁迅`、`/费曼`、`/persona kongzi`、`人物 孔子`。若客户端拦截斜杠命令，使用 `人物 孔子`。这些是项目文本入口，不是客户端内置命令。
 
-创建人物先看 [项目蓝图](docs/01-项目蓝图.md)，再复制 [人物模板](personas/_template)。继续开发先看 [目录与贡献指南](docs/03-项目结构与贡献指南.md)。
+Other entries: `/庄子`, `/鲁迅`, `/费曼`, `/persona kongzi`, or `人物 孔子`. If the host intercepts slash commands, use `人物 孔子`. These are project conventions, not built-in client commands.
 
-## 目录
+入口规则、预览授权和切换方式见 [直接对话/使用方法](直接对话/使用方法.md) 与 [命令入口](直接对话/命令入口.md)。
 
-```text
-3-人物/
-├─ README.md                    # 项目入口
-├─ AGENTS.md                     # Agent 快捷入口路由和维护约定
-├─ docs/                         # 治理、视觉、项目蓝图和贡献指南
-├─ tests/                        # 加载入口与准入回归测试
-├─ 02-人物索引.md                # 全局人物目录与进度看板
-├─ personas/                     # 人物研究档案与可复用模板
-   └─ _template/                 # 每位人物的可复制模板
-      ├─ manifest.json           # 下游程序读取的人物包清单
-      ├─ 00-profile.md           # 完整人物档案、范围、版本与风险
-      ├─ 00-character-card.md    # 面向界面的一页人物卡
-      ├─ assets/avatar-prompt.md # 统一编辑插画头像的生成规范
-      ├─ 01-sources.csv          # 来源台账
-      ├─ 02-evidence.md          # 带出处的证据/观点卡片
-      ├─ 03-persona-spec.md      # 对话行为规范
-      ├─ 03-core-anchors.md      # 最突出注意力、动作与防脸谱化锚点
-      ├─ 03-dialogue-examples.md # 原创正反例与对话节奏样本
-      ├─ 04-evaluation.md        # 评测集和验收记录
-      ├─ 05-dialogue-log.md      # 有价值的使用与纠错记录
-      ├─ 06-build-report.md      # 自动构建与人工审核记录
-      ├─ 08-context-memory.md    # 问题—动作—修正—迁移的细粒度情境记忆
-      ├─ 09-usage-example.md     # 一组提示词—回答—复盘的使用实例
-      ├─ raw/                    # 原始文件或下载信息（不默认入库）
-      ├─ research.local/         # 受保护材料的本地增强层（内容不入 Git）
-      └─ processed/              # JSONL 片段、结构化证据与可重建索引
-├─ 人物蒸馏/                      # 网络搜索/用户上传的一键构建协议
-├─ 直接对话/                      # 单人物的自然聊天子项目
-├─ 圆桌会议/                      # 可暂停、可回放的多人讨论子项目
-├─ 故事推演/                      # 条件—决策—因果—成文的叙事子项目
-└─ 定题演讲/                      # 人物自拟结构、联网研究并形成演讲稿
+See [direct dialogue usage](直接对话/使用方法.md) and [persona commands](直接对话/命令入口.md) for routing, preview authorization, and switching.
+
+## 项目结构 / Project structure
+
+- `personas/`：人物来源、证据、情境记忆、评测和索引 / sources, evidence, context memory, evaluations, and indexes.
+- `人物蒸馏/`：来源处理协议、Schema 和构建工具 / source processing protocols, schemas, and build tools.
+- `直接对话/`：人物快捷入口、Agent 契约和未来 CLI 设计 / persona routing, Agent contract, and future CLI design.
+- `圆桌会议/`、`故事推演/`、`定题演讲/`：后续功能协议和模板 / protocols and templates for later features.
+- `docs/`：治理、架构、视觉和贡献指南 / governance, architecture, visual rules, and contribution guide.
+
+详见 [项目结构与贡献指南](docs/03-项目结构与贡献指南.md)。
+
+See [project structure and contribution guide](docs/03-项目结构与贡献指南.md).
+
+## 设计边界 / Boundaries
+
+- 重要事实、原话和经历必须可回溯到来源；材料不足时承认不确定性。
+- Historical facts, quotations, and experiences must remain traceable; uncertainty is stated when evidence is insufficient.
+- 公开薄包不包含受版权保护的原文、私密上传、未脱敏聊天或 API 密钥。
+- Public packages exclude copyrighted full text, private uploads, unredacted chats, and API keys.
+- 默认只读、不开启网络；需要当前事实核验时才建立临时事实简报。
+- Default operation is read-only with no web request; current facts are checked only when needed.
+
+## 验证 / Verification
+
+```powershell
+python -m unittest discover -s tests -v
+python 直接对话/scripts/resolve_persona.py --list
 ```
 
-## 使用人物体
+人物结构化记忆校验需要 NumPy 环境，命令见各人物构建报告。
 
-直接对话的 Agent 入口已封装为人物快捷选择，加载与回答契约集中在 [prompts/agent.md](直接对话/prompts/agent.md)。完整操作见 [使用方法](直接对话/使用方法.md)。独立 CLI 尚处于 [接口设计](直接对话/docs/CLI设计.md) 阶段。联网默认采用 `facts_only`：平时不搜索，只在用户要求核验或当前事实会改变判断时建立临时事实简报。实现设计见 [运行时策略](直接对话/02-运行时封装与联网策略.md)。
+Structured-memory validation requires an environment with NumPy; see each persona build report for the command.
 
-定题演讲的纯文章版本同样可以立即通过 Agent 使用：选择人物、主题、听众和时长，允许联网形成独立事实简报，再由人物自主立论和成稿。运行协议与模板见 [`定题演讲/README.md`](./定题演讲/README.md)；独立 CLI 与语音输出仍是后续接口。
+## 许可证 / License
 
-## 成功标准
+仓库当前尚未选择统一许可证。发布到 GitHub 前请由项目所有者确定代码、文档、人物资料和图片分别适用的许可证；在此之前请勿将仓库标记为可自由再利用。
 
-一个人物体只有同时满足以下条件，才算可发布的 `v1`：
+This repository does not yet have a single chosen license. Before publishing on GitHub, the project owner should decide licenses for code, documentation, persona data, and images separately. Until then, do not present the repository as freely reusable.
 
-- 至少 30 条重要观点或决策案例能定位到原始材料，并有一组覆盖具体问题、动作、失败或修正的情境记忆；数量只是起点，不替代独立来源和人工审核；
-- 回答事实性问题时，能在需要时区分"原话/可靠转述/模型推断/材料不足"；自然对话不要求每句显式标注；
-- 在未见过的测试问题上，引用正确、风格适度，不编造经历或语录；
-- 明确列出资料覆盖的年代、主题和盲区；
-- 对在世人物具备合适的授权、署名和撤回机制。
+English version: [README.en.md](README.en.md)
+License: [MIT](LICENSE) for project code and original documentation; persona materials and images may have separate rights.
 
-## 最小闭环（建议两周）
-
-第 1--2 天确定人物、目标问题和边界；第 3--6 天收集 20--40 个高质量来源并建立来源台账；第 7--9 天做出 50 张证据卡；第 10--11 天写人物规范并搭建带引用的对话原型；第 12--14 天用评测集验收、记录失败案例、发布 `v0.1`。
-
-证据可追溯、人物有辨识度、对话能自然推进，三者要一起迭代。证据是后台约束和审计入口，不应把前台聊天变成逐句检索报告。
-
-人物包是共同的数据基础；人物卡和头像服务于识别与沉浸；直接对话用于自然交流；圆桌让不同框架碰撞；故事推演让人物的决策方法在明确条件中经受因果链条的检验；定题演讲让人物围绕领域主题自主备课、联网核验当代事实并形成完整讲稿。各层应分工，而不是让一张漂亮卡片替代人物研究。
-
-开源用户应从 [`人物蒸馏/README.md`](./人物蒸馏/README.md) 创建人物。网络搜索和用户上传只是不同的资料入口；经过解析后，两者都必须生成符合 [`人物蒸馏/03-产物契约.md`](./人物蒸馏/03-产物契约.md) 的人物包，才能被直接对话、圆桌会议、故事推演和定题演讲复用。来源名录与实际人物记忆的存储区别见 [`人物蒸馏/05-信息存储模型.md`](./人物蒸馏/05-信息存储模型.md)。
-
-受保护材料采用“公开薄包 + 本地研究增强层”：原文、OCR 和长转写默认不进 Git、也不交给远程 Agent；公开包只吸收非替代性的原创理解。逐源准入和发布规则见 [`人物蒸馏/06-受保护材料处理规范.md`](./人物蒸馏/06-受保护材料处理规范.md)。
