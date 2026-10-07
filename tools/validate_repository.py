@@ -96,6 +96,7 @@ def validate(root: Path = ROOT) -> dict:
                 sorted((root / "人物蒸馏/examples").glob("*.json"))]
     for path in sorted((root / "圆桌会议/_template").glob("*.example.json")):
         examples.append((path, path.name.replace(".example.json", ".schema.json")))
+    examples.extend((path, "session.schema.json") for path in sorted((root / "圆桌会议/examples").glob("*.json")))
     for path, schema_name in examples:
         try:
             errors.extend(schema_errors(json.loads(path.read_text(encoding="utf-8")),

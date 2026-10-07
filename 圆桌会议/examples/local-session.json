@@ -1,0 +1,17 @@
+{
+  "$schema": "../schemas/session.schema.json",
+  "schema_version": "1.0", "protocol_version": "roundtable-runtime/0.1.0",
+  "session_id": "RT-20261007-900", "title": "原创工程夹具：学习判断", "topic": "如何检验一个判断？",
+  "goal": "测试状态协议，不能据此评判人物质量",
+  "participants": [
+    {"person_id": "kongzi", "display_name": "孔子", "package_version": "0.3.0", "adapter_version": "roundtable-adapter/0.1.0", "preview_override": true},
+    {"person_id": "zhuangzi", "display_name": "庄子", "package_version": "0.1.0", "adapter_version": "roundtable-adapter/0.1.0", "preview_override": true}
+  ],
+  "user_role": "observer", "network_policy": "off",
+  "limits": {"max_sections": 1, "max_turns": 2, "max_chars_per_turn": 600, "no_new_claim_limit": 2},
+  "status": "draft", "preview_override": true,
+  "created_at": "2026-10-07T14:00:00+08:00", "started_at": null, "updated_at": "2026-10-07T14:00:00+08:00",
+  "state_version": 0, "fact_brief_id": null, "active_generation": null,
+  "current": {"section_index": 0, "turn_index": 0, "next_speaker": "kongzi", "question": "如何检验一个判断？",
+              "consensus": [], "disagreements": [], "pending_claim_ids": [], "pending_user_event_id": null}
+}
