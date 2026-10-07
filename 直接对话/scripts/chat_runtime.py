@@ -94,8 +94,9 @@ class ChatSession:
                 "post_hoc_audit": search_memory(self.person_id, query, self.root, self.preview, 4)}
 
     def sessions_dir(self) -> Path:
-        path = self.root / "直接对话/sessions"
-        if path.is_symlink() or not path.resolve().is_relative_to(self.root):
+        root = self.root.resolve()
+        path = root / "直接对话/sessions"
+        if path.is_symlink() or not path.resolve().is_relative_to(root):
             raise ValueError("Session storage must stay inside the workspace")
         return path
 

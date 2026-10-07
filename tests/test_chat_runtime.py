@@ -112,6 +112,15 @@ class ChatRuntimeTests(unittest.TestCase):
         self.assertEqual(len(session.messages), 1)
         self.assertTrue(any("post_hoc_audit" in line for line in output))
 
+    def test_summary_storage_accepts_equivalent_workspace_path(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            session = ChatSession("kongzi", StubProvider([]), preview=True)
+            session.root = Path(temporary) / "unused" / ".."
+            identifier = session.save_summary("确认保存")
+            saved = Path(temporary).resolve() / "直接对话/sessions" / identifier / "summary.json"
+            self.assertTrue(saved.is_file())
+            self.assertEqual(session.sessions_dir(), saved.parent.parent)
+
 
 class OllamaTransportTests(unittest.TestCase):
     def test_nonlocal_cloud_and_credential_urls_are_refused(self):
