@@ -39,7 +39,7 @@ flowchart LR
 5. 在审核页查看覆盖度、警告、人物卡和测试对话；
 6. 选择“保留为私有草稿”或“发布人物包”。
 
-未来 CLI 可采用以下接口（这是待实现的产品契约，目前不是可运行命令）：
+已有 [本地 TXT/Markdown 准备 CLI](08-本地文本准备工具.md)：`scripts/distill.py init / build / status / approve`，处理到人工证据审核。它不自动生成或发布人物包。完整蒸馏 CLI 的后续目标接口如下（不是当前可运行命令）：
 
 ```powershell
 persona-distill init --mode web
@@ -58,6 +58,7 @@ persona-distill publish --job <job-id>
 - [`05-信息存储模型.md`](./05-信息存储模型.md)：规范化片段、结构化证据卡与可重建索引怎样保存。
 - [`06-受保护材料处理规范.md`](./06-受保护材料处理规范.md)：公开人物包、本地研究层、远程模型与发布的权利边界。
 - [`07-时代语言与翻译腔规范.md`](./07-时代语言与翻译腔规范.md)：人物如何直接说话，以及古语体、古典译文腔和现代译文腔怎样保持沉浸而不伪造原话。
+- [`08-本地文本准备工具.md`](./08-本地文本准备工具.md)：已实现的上传任务准备、审核、快照与增量用法。
 - [`schemas/distillation-job.schema.json`](./schemas/distillation-job.schema.json)：机器可读的任务配置结构。
 - [`examples`](./examples)：两种模式的最小任务配置例子。
 - [`scripts/build_structured_memory.py`](./scripts/build_structured_memory.py)：将已审核的手工人物包迁移为 JSONL 与本地检索索引。

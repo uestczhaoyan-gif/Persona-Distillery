@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "job": {"id": "local-fictional-001", "created_by": "local-maintainer", "notes": "Only original fictional fixture text; no real participant data."},
+  "subject": {"person_id": "fictional-teacher", "display_name": "虚构教学夹具", "kind": "fictional"},
+  "purpose": {"goals": ["检验本地文本准备与人工证据审核接口"], "target_capabilities": ["direct_chat"]},
+  "input": {"mode": "upload", "upload": {"incoming_directory": "../runs/local-fictional-001-incoming", "allow_ocr": false, "allow_transcription": false}},
+  "privacy": {"local_only": true, "network_enabled": false, "remote_processing_allowed": false, "publish_visibility": "private", "redact_third_parties": true, "retain_raw_inputs": false},
+  "quality": {"minimum_independent_sources": 1, "minimum_evidence_cards": 1, "holdout_fraction": 0.2, "require_human_publish_review": true},
+  "output": {"personas_directory": "../../personas", "target_level": "draft", "overwrite_existing": false}
+}

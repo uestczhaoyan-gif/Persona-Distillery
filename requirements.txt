@@ -1,0 +1,2 @@
+# Local upload job Schema validation. Inspection/search/chat use standard library.
+jsonschema>=4.23,<5
