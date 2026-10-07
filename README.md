@@ -8,15 +8,29 @@
 
 ## 当前能力
 
-当前为 **v0.1.0 研究预览**，包含孔子、庄子、鲁迅、理查德·费曼四个人物包。
+当前为 **v0.2.0 本地工程预览**，包含孔子、庄子、鲁迅、理查德·费曼四个人物包。
 
 - 整理来源、证据、结构化记忆、情境与评测资料。
 - 通过 Agent 直读流程加载材料，进行单人人物视角对话。
 - 使用别名解析器生成加载计划，检查人物入口与资料路径。
+- 本地 CLI 检查人物包、检索记忆、编译上下文，并连接显式选择的本机 Ollama 模型。
+- TXT/Markdown 上传准备工具支持审核、去重、切分、增量更新，停在人工证据审核。
+- 离线圆桌状态工具支持票据、暂停/恢复、原子提交和已审核文章导入。
 
 人物包仍为 draft/private，供已有授权的维护者本地只读预览。已有 [本地检查、记忆检索和 Ollama 对话 CLI](直接对话/docs/本地工具.md)。Web 服务、圆桌模型运行时、故事分支和语音输出尚未实现；相关设计与模板不等于可运行产品。
 
 ## 快速开始
+
+需要 Python 3.10+。在仓库根目录运行；以下检查不调用模型：
+
+```powershell
+python -m pip install -r requirements.txt
+python 直接对话/scripts/persona.py list
+python 直接对话/scripts/persona.py doctor kongzi --preview
+python 直接对话/scripts/persona.py search 孔子 学习 --preview --top-k 3
+```
+
+`--preview` 仅用于已经获得授权的历史公共人物本地预览。连接已安装的本机模型、保存摘要和恢复会话见 [本地工具](直接对话/docs/本地工具.md)；上传准备见 [文本准备工具](人物蒸馏/08-本地文本准备工具.md)；圆桌见 [本地状态工具](圆桌会议/11-本地状态工具.md)。
 
 在能读取工作区的 Agent 中打开仓库根目录，发送：
 
@@ -33,12 +47,13 @@
 | 目录 | 内容 |
 | --- | --- |
 | personas/ | 人物来源、证据、记忆、评测、manifest 与索引 |
-| 人物蒸馏/ | 来源处理协议、Schema 与结构化记忆工具 |
-| 直接对话/ | 人物入口、加载计划解析器与 Agent 回答契约 |
-| 圆桌会议/、故事推演/、定题演讲/ | 后续能力的协议、设计与模板 |
+| 人物蒸馏/ | 来源处理协议、Schema、结构化记忆与上传准备工具 |
+| 直接对话/ | 人物入口、Agent 契约、本地检索与 Ollama CLI |
+| 圆桌会议/ | 讨论协议、离线状态工具与文章导出 |
+| 故事推演/、定题演讲/ | 后续能力的协议、设计与模板 |
 | docs/ | 架构、治理、视觉规范与贡献指南 |
 
-详见[项目结构与贡献指南](docs/03-项目结构与贡献指南.md)和[版本说明](RELEASE.md)。
+详见[项目结构与贡献指南](docs/03-项目结构与贡献指南.md)、[版本说明](RELEASE.md)、[完善计划](docs/04-完善计划.md)、[执行状态](PROJECT_STATUS.md)和[验收报告](docs/06-验收报告.md)。
 
 ## 证据与使用边界
 
@@ -49,14 +64,15 @@
 
 ## 开发验证
 
-入口解析器需要 Python 3.10+，仅使用标准库。在仓库根目录运行：
+开发依赖包含 jsonschema 和 NumPy。在仓库根目录运行：
 
 ```powershell
+python -m pip install -r requirements-dev.txt
 python -m unittest discover -s tests -v
-python 直接对话/scripts/resolve_persona.py --list
+python tools/validate_repository.py
 ```
 
-结构化记忆构建与校验另需 NumPy，命令见各人物构建报告。测试通过不等于对话质量已验证，仍需独立题目与人工评测。
+GitHub Actions 使用 Linux/Windows × Python 3.10/3.12 验证。测试使用离线桩与本机 HTTP 桩；通过不等于真实模型对话质量已验证，仍需独立题目与人工评测。
 
 ## 许可证
 

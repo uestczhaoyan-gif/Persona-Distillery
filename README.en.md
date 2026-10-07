@@ -8,15 +8,35 @@ These are simulations grounded in research, not the people themselves or stateme
 
 ## What works today
 
-This is a **v0.1.0 research preview** with four persona packages: Confucius, Zhuangzi, Lu Xun, and Richard Feynman.
+This is a **v0.2.0 local engineering preview** with four persona packages: Confucius, Zhuangzi, Lu Xun, and Richard Feynman.
 
 - Sources, evidence, structured memories, contexts, and evaluation material.
 - An agent direct-read workflow for loading material and holding single-persona conversations.
 - An alias resolver that produces loading plans and checks persona routes and file paths.
+- A local CLI for package checks, lexical memory search, context compilation, and explicitly selected local Ollama models.
+- TXT/Markdown upload preparation with review gates, deduplication, chunking, immutable snapshots, and incremental changes. Evidence synthesis remains a human step.
+- An offline roundtable state CLI with request tickets, pause/resume, atomic turn commits, and reviewed article import.
 
-Packages remain draft/private for authorized, read-only local maintainer previews. A standalone CLI, Web service, roundtable runtime, story branching, and voice output are not implemented. Designs and templates are not runnable products.
+Packages remain draft/private for authorized local maintainer previews. Web service, model-driven roundtable orchestration, story branching, and voice output remain future work. Persona publication and dialogue quality require separate review.
 
 ## Quick start
+
+Use Python 3.10+ and run from the repository root. These checks do not call a model:
+
+```powershell
+python -m pip install -r requirements.txt
+python 直接对话/scripts/persona.py list
+python 直接对话/scripts/persona.py doctor kongzi --preview
+python 直接对话/scripts/persona.py search kongzi E-0001 --preview --top-k 3
+```
+
+Use `--preview` only for an already authorized local historical-public persona preview. With Ollama already running and a local model installed, replace the example model name:
+
+```powershell
+python 直接对话/scripts/persona.py chat kongzi --preview --provider ollama --model 'your-local-model'
+```
+
+The provider accepts loopback HTTP only and checks model metadata to reject remote models. It does not download models or perform web search. `/research on`, `/sources`, and `/counterevidence` expose the research layer. `/save your-summary` asks for confirmation and saves only that summary; resume with `--resume chat-<saved-id>` for the same persona and package version. Full conversations are not saved by default. See [local tool instructions](直接对话/docs/本地工具.md), [upload preparation](人物蒸馏/08-本地文本准备工具.md), and [roundtable state tools](圆桌会议/11-本地状态工具.md), currently in Chinese.
 
 Open the repository root in an agent that can read workspace files and send:
 
@@ -33,12 +53,13 @@ A first draft preview requires maintainer authorization; existing session or loc
 | Directory | Contents |
 | --- | --- |
 | personas/ | Persona sources, evidence, memories, evaluations, manifests, and indexes |
-| 人物蒸馏/ | Source-processing protocols, schemas, and structured-memory tools |
-| 直接对话/ | Persona routing, loading-plan resolver, and agent response contract |
-| 圆桌会议/, 故事推演/, 定题演讲/ | Protocols, designs, and templates for future capabilities |
+| 人物蒸馏/ | Source protocols, schemas, structured-memory and local upload tools |
+| 直接对话/ | Persona routing, agent contract, memory search, and local Ollama CLI |
+| 圆桌会议/ | Discussion protocol, offline state tools, and article export |
+| 故事推演/, 定题演讲/ | Protocols, designs, and templates for future capabilities |
 | docs/ | Architecture, governance, visual rules, and contribution guidance |
 
-See the [structure and contribution guide](docs/03-项目结构与贡献指南.md) and [release notes](RELEASE.md).
+See the [contribution guide](docs/03-项目结构与贡献指南.md), [release notes](RELEASE.md), [finite improvement plan](docs/04-完善计划.md), [execution status](PROJECT_STATUS.md), and [acceptance report](docs/06-验收报告.md).
 
 ## Evidence and boundaries
 
@@ -49,14 +70,15 @@ See the [structure and contribution guide](docs/03-项目结构与贡献指南.m
 
 ## Development checks
 
-The routing resolver requires Python 3.10+ and uses the standard library. Run from the repository root:
+Development dependencies include jsonschema and NumPy. Run from the repository root:
 
 ```powershell
+python -m pip install -r requirements-dev.txt
 python -m unittest discover -s tests -v
-python 直接对话/scripts/resolve_persona.py --list
+python tools/validate_repository.py
 ```
 
-Structured-memory building and validation also require NumPy; see individual persona build reports for commands. Passing software checks does not establish dialogue quality, which still needs held-out questions and human evaluation.
+GitHub Actions validates Linux/Windows with Python 3.10/3.12. Tests use offline and loopback HTTP stubs. Passing software checks does not establish real-model dialogue quality, which still needs held-out questions and human evaluation. Character budgets are not tokenizer context guarantees.
 
 ## License
 
