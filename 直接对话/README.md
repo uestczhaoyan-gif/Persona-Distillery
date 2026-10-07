@@ -8,9 +8,9 @@
 | `prompts/agent.md` | 唯一的 Agent 加载与回答契约 |
 | `personas/` | 本功能专用适配层，不存人物事实副本 |
 | `scripts/resolve_persona.py` | 只读加载计划与准入检查，非聊天运行时 |
-| `scripts/persona.py` | 本地 `list / doctor / search / context` 工具，见 [使用说明](docs/本地工具.md) |
+| `scripts/persona.py` | 本地 `list / doctor / search / context / chat` CLI，见 [使用说明](docs/本地工具.md) |
 | `_template/` | 会话与本地预览配置的空白模板 |
-| `docs/CLI设计.md` | 尚未实现的 CLI 接口 |
+| `docs/CLI设计.md` | 完整目标接口和已实现边界 |
 
 人物选择、后台提示封装和按需联网设计见 [运行时策略](02-运行时封装与联网策略.md)。
 

@@ -143,6 +143,17 @@ def compile_context(name: str, root: Path = ROOT, preview: bool = False,
     manifest = read_json(checked_file(package, "manifest.json"))
     memory_paths = {f"personas/{plan['person_id']}/{manifest['files'][role]}"
                     for role in ("evidence", "context_memory") if role in manifest["files"]}
+    _, searchable = load_memory(name, root, preview)
+    allowed_ids = {item["id"] for item in searchable}
+    withheld_paths = set()
+    for markdown_role, structured_role, id_key in (
+        ("evidence", "structured_evidence", "evidence_id"),
+        ("context_memory", "structured_context_memory", "memory_id"),
+    ):
+        if markdown_role in manifest["files"] and structured_role in manifest["files"]:
+            records = jsonl(checked_file(package, manifest["files"][structured_role]))
+            if any(item.get(id_key) not in allowed_ids for item in records):
+                withheld_paths.add(f"personas/{plan['person_id']}/{manifest['files'][markdown_role]}")
     blocks = [(p, f"\n<package-file path={json.dumps(p, ensure_ascii=False)}>\n"
                   + (root / p).read_text(encoding="utf-8-sig") + "\n</package-file>\n")
               for p in plan["load_files"]]
@@ -156,8 +167,11 @@ def compile_context(name: str, root: Path = ROOT, preview: bool = False,
     total_chars = len(header) + sum(len(text) for _, text in blocks)
     omitted = []
     included = []
-    budget = max_chars - required_chars - (len(retrieval_note) if total_chars > max_chars else 0)
+    budget = max_chars - required_chars - (len(retrieval_note) if total_chars > max_chars or withheld_paths else 0)
     for path, text in blocks:
+        if path in withheld_paths:
+            omitted.append(path)
+            continue
         if path in memory_paths and total_chars > max_chars:
             if len(text) > budget:
                 omitted.append(path)

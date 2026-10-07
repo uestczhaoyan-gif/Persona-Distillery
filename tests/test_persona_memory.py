@@ -84,6 +84,9 @@ class PersonaMemoryTests(unittest.TestCase):
         path.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in records), encoding="utf-8")
         self.assertEqual(search_memory("kongzi", "E-0001", root, True, kind="evidence")["results"], [])
         self.assertEqual(search_memory("kongzi", "E-0002", root, True, kind="evidence")["results"], [])
+        compiled = compile_context("kongzi", root, True)
+        self.assertIn("personas/kongzi/02-evidence.md", compiled["omitted_memory_files"])
+        self.assertTrue(compiled["requires_search_tool"])
 
     def test_unknown_source_is_an_error(self):
         root = self.fixture()
