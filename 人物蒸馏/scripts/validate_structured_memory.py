@@ -139,7 +139,7 @@ def validate(person_dir: Path) -> dict[str, Any]:
     if np.any((norms < 0.999) | (norms > 1.001)):
         errors.append("vector rows are not L2-normalized")
 
-    connection = sqlite3.connect(index_dir / "memory.sqlite3")
+    connection = sqlite3.connect((index_dir / "memory.sqlite3").resolve().as_uri() + "?mode=ro", uri=True)
     sqlite_counts = {
         "sources": connection.execute("SELECT count(*) FROM sources").fetchone()[0],
         "chunks": connection.execute("SELECT count(*) FROM chunks").fetchone()[0],

@@ -1,0 +1,3 @@
+# Validation and structured-memory tools; dialogue loading/search use stdlib.
+numpy>=1.26,<3
+jsonschema>=4.23,<5

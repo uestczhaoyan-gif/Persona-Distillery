@@ -12,6 +12,7 @@
 .env.*
 !.env.example
 .venv/
+.work/
 
 # Generated Python bytecode is never part of a persona package.
 **/__pycache__/

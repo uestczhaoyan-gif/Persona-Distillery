@@ -6,6 +6,7 @@
   "additionalProperties": false,
   "required": ["schema_version", "action", "next_speaker", "responds_to", "instruction", "reason", "stop_signal"],
   "properties": {
+    "$schema": { "type": "string" },
     "schema_version": { "const": "1.0" },
     "action": { "enum": ["speak", "pause", "ask_user", "fact_check", "end_section", "end_session"] },
     "next_speaker": { "type": ["string", "null"], "pattern": "^[a-z0-9][a-z0-9-]{1,63}$" },
