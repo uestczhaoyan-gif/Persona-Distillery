@@ -22,6 +22,9 @@ import uuid
 
 from jsonschema import Draft202012Validator, FormatChecker
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from package_policy import require_legacy_job
+
 ROOT = Path(__file__).resolve().parents[2]
 PIPELINE_VERSION = "local-text-v1"
 JOB_ID = re.compile(r"[a-z0-9][a-z0-9-]{2,63}")
@@ -95,6 +98,7 @@ def locked(directory: Path):
 
 
 def validate_config(job: dict, root: Path) -> None:
+    require_legacy_job(job)
     schema = read_json(root / "人物蒸馏/schemas/distillation-job.schema.json")
     errors = list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(job))
     if errors:
@@ -138,8 +142,9 @@ def initialize(config: Path, root: Path = ROOT) -> dict:
 
 
 def load_job(directory: Path, root: Path) -> tuple[dict, dict, dict]:
-    job, paths, state = (read_json(directory / name) for name in ("job.json", "paths.private.json", "state.json"))
+    job = read_json(directory / "job.json")
     validate_config(job, root)
+    paths, state = (read_json(directory / name) for name in ("paths.private.json", "state.json"))
     if (state.get("config_sha256") != digest(canonical(job).encode())
             or state.get("paths_sha256") != digest(canonical(paths).encode())
             or state.get("pipeline_version") != PIPELINE_VERSION or job["job"]["id"] != directory.name):

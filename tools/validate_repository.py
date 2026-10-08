@@ -94,6 +94,8 @@ def validate(root: Path = ROOT) -> dict:
     # Validate actual distributable examples, not placeholder persona manifests.
     examples = [(p, "distillation-job.schema.json") for p in
                 sorted((root / "人物蒸馏/examples").glob("*.json"))]
+    examples.extend((p, "distillation-job-v2.schema.json") for p in
+                    sorted((root / "人物蒸馏/examples/v2").glob("*.json")))
     for path in sorted((root / "圆桌会议/_template").glob("*.example.json")):
         examples.append((path, path.name.replace(".example.json", ".schema.json")))
     examples.extend((path, "session.schema.json") for path in sorted((root / "圆桌会议/examples").glob("*.json")))

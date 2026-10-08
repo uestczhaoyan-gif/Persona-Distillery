@@ -87,3 +87,10 @@ def require_legacy_manifest(manifest: dict) -> None:
         raise ValueError("Unsupported persona schema_version; this reader only supports 1.0")
     if FUTURE_POLICY_FIELDS.intersection(manifest):
         raise ValueError("Unsupported policy fields in legacy manifest; explicit migration is required")
+
+
+def require_legacy_job(job: dict) -> None:
+    if not isinstance(job, dict) or job.get("schema_version") != "1.0":
+        raise ValueError("Unsupported job schema_version; use the dedicated v2 local job entry")
+    if ({"policy", "material_declaration"} | FUTURE_POLICY_FIELDS).intersection(job):
+        raise ValueError("New job policy cannot be downgraded into a legacy configuration")

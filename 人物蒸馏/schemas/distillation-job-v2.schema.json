@@ -1,0 +1,747 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/persona-distill/schemas/distillation-job-v2.schema.json",
+  "title": "Local distillation job v2: policy and source declaration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "job",
+    "subject",
+    "purpose",
+    "input",
+    "quality",
+    "output",
+    "policy",
+    "material_declaration"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "2.0"
+    },
+    "job": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "created_by"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"
+        },
+        "created_by": {
+          "type": "string",
+          "minLength": 1
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "person_id",
+        "display_name",
+        "kind"
+      ],
+      "properties": {
+        "person_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "historical_public",
+            "deceased_private",
+            "living_public",
+            "living_private",
+            "self",
+            "fictional"
+          ]
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "identity_anchors": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "active_years": {
+              "type": "string"
+            },
+            "regions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "disambiguation_note": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "purpose": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "goals",
+        "target_capabilities"
+      ],
+      "properties": {
+        "goals": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "target_capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "direct_chat",
+              "roundtable",
+              "story_simulation",
+              "themed_lecture"
+            ]
+          }
+        },
+        "excluded_topics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "upload"
+      ],
+      "properties": {
+        "mode": {
+          "const": "upload"
+        },
+        "upload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "incoming_directory"
+          ],
+          "properties": {
+            "incoming_directory": {
+              "type": "string",
+              "minLength": 1
+            },
+            "participant_map_file": {
+              "type": "string"
+            },
+            "allow_ocr": {
+              "type": "boolean",
+              "default": true
+            },
+            "allow_transcription": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimum_independent_sources",
+        "minimum_evidence_cards",
+        "holdout_fraction",
+        "require_human_publish_review"
+      ],
+      "properties": {
+        "minimum_independent_sources": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum_evidence_cards": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "holdout_fraction": {
+          "type": "number",
+          "minimum": 0.05,
+          "maximum": 0.5
+        },
+        "require_human_publish_review": {
+          "const": true
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "personas_directory",
+        "target_level"
+      ],
+      "properties": {
+        "personas_directory": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_level": {
+          "enum": [
+            "draft",
+            "chat-ready",
+            "simulation-ready",
+            "publish-ready"
+          ]
+        },
+        "overwrite_existing": {
+          "const": false
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_version",
+        "subject_kind",
+        "sensitive_data",
+        "material_basis",
+        "execution_policy",
+        "distribution_policy",
+        "review_status"
+      ],
+      "properties": {
+        "policy_version": {
+          "const": "1.0"
+        },
+        "subject_kind": {
+          "enum": [
+            "historical_public",
+            "deceased_private",
+            "living_public",
+            "living_private",
+            "self",
+            "fictional"
+          ]
+        },
+        "sensitive_data": {
+          "type": "boolean"
+        },
+        "material_basis": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "public_source",
+              "self_report",
+              "user_recollection",
+              "authorized_private",
+              "original_fiction"
+            ]
+          }
+        },
+        "execution_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "allowed_services"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "local_only",
+                "declared_services"
+              ]
+            },
+            "allowed_services": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9_-]{1,63}$"
+              }
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "mode": {
+                    "const": "local_only"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "allowed_services": {
+                    "maxItems": 0
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "mode": {
+                    "const": "declared_services"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "allowed_services": {
+                    "minItems": 1
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "distribution_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "local_only",
+                "review_required",
+                "public_approved"
+              ]
+            }
+          }
+        },
+        "review_status": {
+          "enum": [
+            "candidate",
+            "reviewed"
+          ]
+        },
+        "publication_review": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "record_id",
+            "reviewer_id",
+            "reviewed_on",
+            "content_digest"
+          ],
+          "properties": {
+            "record_id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{1,127}$"
+            },
+            "reviewer_id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{1,127}$"
+            },
+            "reviewed_on": {
+              "type": "string",
+              "format": "date"
+            },
+            "content_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "anyOf": [
+              {
+                "properties": {
+                  "subject_kind": {
+                    "enum": [
+                      "living_public",
+                      "living_private",
+                      "deceased_private"
+                    ]
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "sensitive_data": {
+                    "const": true
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "material_basis": {
+                    "contains": {
+                      "enum": [
+                        "authorized_private",
+                        "user_recollection"
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "then": {
+            "properties": {
+              "execution_policy": {
+                "properties": {
+                  "mode": {
+                    "const": "local_only"
+                  }
+                }
+              },
+              "distribution_policy": {
+                "properties": {
+                  "mode": {
+                    "const": "local_only"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "distribution_policy": {
+                "properties": {
+                  "mode": {
+                    "const": "local_only"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "execution_policy": {
+                "properties": {
+                  "mode": {
+                    "const": "local_only"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "distribution_policy": {
+                "properties": {
+                  "mode": {
+                    "const": "public_approved"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "publication_review"
+            ],
+            "properties": {
+              "review_status": {
+                "const": "reviewed"
+              }
+            }
+          },
+          "else": {
+            "not": {
+              "required": [
+                "publication_review"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "material_declaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "declared_by",
+        "declared_on",
+        "rights_to_process",
+        "private_communications",
+        "third_party_review"
+      ],
+      "properties": {
+        "declared_by": {
+          "type": "string",
+          "minLength": 1
+        },
+        "declared_on": {
+          "type": "string",
+          "format": "date"
+        },
+        "rights_to_process": {
+          "const": true
+        },
+        "private_communications": {
+          "type": "boolean"
+        },
+        "third_party_review": {
+          "enum": [
+            "not_present",
+            "pending",
+            "reviewed"
+          ]
+        },
+        "authorization_record": {
+          "type": "string",
+          "minLength": 1
+        },
+        "recollection_acknowledged": {
+          "const": true
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "private_communications": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "authorization_record"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "properties": {
+        "policy": {
+          "properties": {
+            "execution_policy": {
+              "properties": {
+                "mode": {
+                  "const": "local_only"
+                }
+              }
+            },
+            "distribution_policy": {
+              "properties": {
+                "mode": {
+                  "const": "local_only"
+                }
+              }
+            },
+            "review_status": {
+              "const": "candidate"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "policy": {
+            "properties": {
+              "material_basis": {
+                "contains": {
+                  "const": "user_recollection"
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "material_declaration": {
+            "required": [
+              "recollection_acknowledged"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "subject": {
+            "properties": {
+              "kind": {
+                "const": "historical_public"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "policy": {
+            "properties": {
+              "subject_kind": {
+                "const": "historical_public"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "subject": {
+            "properties": {
+              "kind": {
+                "const": "deceased_private"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "policy": {
+            "properties": {
+              "subject_kind": {
+                "const": "deceased_private"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "subject": {
+            "properties": {
+              "kind": {
+                "const": "living_public"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "policy": {
+            "properties": {
+              "subject_kind": {
+                "const": "living_public"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "subject": {
+            "properties": {
+              "kind": {
+                "const": "living_private"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "policy": {
+            "properties": {
+              "subject_kind": {
+                "const": "living_private"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "subject": {
+            "properties": {
+              "kind": {
+                "const": "self"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "policy": {
+            "properties": {
+              "subject_kind": {
+                "const": "self"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "subject": {
+            "properties": {
+              "kind": {
+                "const": "fictional"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "policy": {
+            "properties": {
+              "subject_kind": {
+                "const": "fictional"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

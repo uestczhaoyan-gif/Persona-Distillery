@@ -1,0 +1,63 @@
+{
+  "schema_version": "2.0",
+  "job": {
+    "id": "local-v2-fixture",
+    "created_by": "local-maintainer",
+    "notes": "Only original fictional fixture text; no real participant data."
+  },
+  "subject": {
+    "person_id": "fictional-teacher",
+    "display_name": "虚构教学夹具",
+    "kind": "fictional"
+  },
+  "purpose": {
+    "goals": [
+      "检验本地文本准备与人工证据审核接口"
+    ],
+    "target_capabilities": [
+      "direct_chat"
+    ]
+  },
+  "input": {
+    "mode": "upload",
+    "upload": {
+      "incoming_directory": "./incoming",
+      "allow_ocr": false,
+      "allow_transcription": false
+    }
+  },
+  "quality": {
+    "minimum_independent_sources": 1,
+    "minimum_evidence_cards": 1,
+    "holdout_fraction": 0.2,
+    "require_human_publish_review": true
+  },
+  "output": {
+    "personas_directory": "./private-personas",
+    "target_level": "draft",
+    "overwrite_existing": false
+  },
+  "policy": {
+    "policy_version": "1.0",
+    "subject_kind": "fictional",
+    "sensitive_data": false,
+    "material_basis": [
+      "original_fiction"
+    ],
+    "execution_policy": {
+      "mode": "local_only",
+      "allowed_services": []
+    },
+    "distribution_policy": {
+      "mode": "local_only"
+    },
+    "review_status": "candidate"
+  },
+  "material_declaration": {
+    "declared_by": "fixture-author",
+    "declared_on": "2026-10-09",
+    "rights_to_process": true,
+    "private_communications": false,
+    "third_party_review": "not_present"
+  }
+}
