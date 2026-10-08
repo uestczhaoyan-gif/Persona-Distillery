@@ -19,7 +19,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "直接对话/scripts"))
-from resolve_persona import checked_file, read_json, registry
+from resolve_persona import checked_file, read_json, registry, require_legacy_manifest
 
 NOTICE = "这是基于材料构建的人物视角模拟讨论，不是历史记录或真实发言。"
 
@@ -93,6 +93,7 @@ def participant_pins(session: dict, root: Path, preview: bool) -> dict:
             raise ValueError("Symlink package refused")
         manifest_file = checked_file(package, "manifest.json")
         manifest = read_json(manifest_file)
+        require_legacy_manifest(manifest)
         if manifest.get("person_id") != person_id or manifest.get("package_version") != participant["package_version"]:
             raise ValueError("Participant identity/version mismatch")
         if manifest.get("display_name") != participant["display_name"]:
@@ -308,6 +309,7 @@ def commit_turn(ticket: dict, turn: dict, root: Path = ROOT) -> dict:
             raise ValueError("Claim response target does not exist")
         package = root / "personas" / turn["speaker_id"]
         manifest = read_json(checked_file(package, "manifest.json"))
+        require_legacy_manifest(manifest)
         evidence_path = checked_file(package, manifest["files"]["structured_evidence"])
         evidence = {e["evidence_id"]: e for e in (json.loads(line) for line in evidence_path.read_text(encoding="utf-8").splitlines() if line)}
         with checked_file(package, manifest["files"]["sources"]).open(encoding="utf-8-sig", newline="") as handle:

@@ -71,6 +71,16 @@ class RoundtableStateTests(unittest.TestCase):
         self.assertFalse(manifest["capabilities"]["roundtable"])
         self.assertEqual(manifest["readiness"], "draft")
 
+    def test_unknown_persona_schema_is_refused_before_adapter_read(self):
+        path = self.root / "personas/kongzi/manifest.json"
+        manifest = rt.read_json(path)
+        manifest["schema_version"] = "2.0"
+        path.write_text(json.dumps(manifest), encoding="utf-8")
+        with patch.object(rt, "checked_file", wraps=rt.checked_file) as checking:
+            with self.assertRaisesRegex(ValueError, "schema_version"):
+                rt.participant_pins(self.config, self.root, preview=True)
+            self.assertEqual([c.args[1] for c in checking.call_args_list], ["manifest.json"])
+
     def test_pause_and_resume_discard_late_response(self):
         self.start()
         ticket = self.ticket()

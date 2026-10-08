@@ -6,6 +6,10 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from package_policy import require_legacy_manifest
 
 
 def read_jsonl(path: Path) -> list[dict]:
@@ -15,6 +19,8 @@ def read_jsonl(path: Path) -> list[dict]:
 
 
 def export(person_dir: Path) -> None:
+    manifest = json.loads((person_dir / "manifest.json").read_text(encoding="utf-8-sig"))
+    require_legacy_manifest(manifest)
     local = person_dir / "research.local"
     overlay = json.loads((local / "overlay.json").read_text(encoding="utf-8"))
     remote = overlay["remote_agent"]

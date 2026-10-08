@@ -10,6 +10,9 @@ import sys
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "人物蒸馏/scripts"))
+from package_policy import require_legacy_manifest
+
 PERSON_ID = re.compile(r"[a-z0-9][a-z0-9-]{1,63}")
 READY = {"chat-ready", "simulation-ready", "publish-ready"}
 ROLES = (
@@ -90,6 +93,7 @@ def resolve_persona(name: str, root: Path = ROOT, preview: bool = False) -> dict
         raise ValueError("Persona package must stay inside personas/")
     manifest_path = checked_file(package, "manifest.json")
     manifest = read_json(manifest_path)
+    require_legacy_manifest(manifest)
     if manifest.get("person_id") != person_id:
         raise ValueError("Manifest identity does not match directory")
     capabilities = manifest.get("capabilities")

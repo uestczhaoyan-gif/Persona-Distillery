@@ -59,6 +59,7 @@ persona-distill publish --job <job-id>
 - [`06-受保护材料处理规范.md`](./06-受保护材料处理规范.md)：公开人物包、本地研究层、远程模型与发布的权利边界。
 - [`07-时代语言与翻译腔规范.md`](./07-时代语言与翻译腔规范.md)：人物如何直接说话，以及古语体、古典译文腔和现代译文腔怎样保持沉浸而不伪造原话。
 - [`08-本地文本准备工具.md`](./08-本地文本准备工具.md)：已实现的上传任务准备、审核、快照与增量用法。
+- [`09-执行与传播策略契约.md`](./09-执行与传播策略契约.md)：旧读取器版本检查，以及新版私人本地路径的分节点实现合同。
 - [`schemas/distillation-job.schema.json`](./schemas/distillation-job.schema.json)：机器可读的任务配置结构。
 - [`examples`](./examples)：两种模式的最小任务配置例子。
 - [`scripts/build_structured_memory.py`](./scripts/build_structured_memory.py)：将已审核的手工人物包迁移为 JSONL 与本地检索索引。

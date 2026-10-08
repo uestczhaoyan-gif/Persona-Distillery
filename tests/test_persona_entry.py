@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
@@ -28,6 +29,7 @@ class PersonaEntryTests(unittest.TestCase):
             "schema_version": "1.0", "aliases": {"Example": "sample"},
         })
         self.manifest = {
+            "schema_version": "1.0",
             "person_id": "sample", "display_name": "Example", "package_version": "0.1.0",
             "subject_kind": "historical_public", "readiness": "draft", "visibility": "private",
             "capabilities": {"direct_chat": True},
@@ -84,6 +86,28 @@ class PersonaEntryTests(unittest.TestCase):
         self.manifest.update(readiness="chat-ready", visibility="public")
         self.save_manifest()
         self.assertEqual(entry.resolve_persona("sample", self.root)["mode"], "public")
+
+    def test_unsupported_manifest_version_fails_before_body_access(self):
+        for version in (None, "2.0", "1.1", 1, ["1.0"]):
+            for public in (False, True):
+                with self.subTest(version=version, public=public):
+                    self.manifest.update(schema_version=version,
+                                         readiness="chat-ready" if public else "draft",
+                                         visibility="public" if public else "private")
+                    self.save_manifest()
+                    with patch.object(entry, "checked_file", wraps=entry.checked_file) as checking:
+                        with self.assertRaisesRegex(ValueError, "schema_version"):
+                            entry.resolve_persona("sample", self.root, preview=True)
+                        self.assertEqual([c.args[1] for c in checking.call_args_list], ["manifest.json"])
+
+    def test_future_policy_cannot_be_silently_downgraded_to_v1(self):
+        for field in ("execution_policy", "distribution_policy", "material_basis", "review_status"):
+            with self.subTest(field=field):
+                self.manifest[field] = "local_only"
+                self.save_manifest()
+                with self.assertRaisesRegex(ValueError, "policy fields"):
+                    entry.resolve_persona("sample", self.root, preview=True)
+                del self.manifest[field]
 
     def test_disabled_capability_cannot_be_bypassed(self):
         self.manifest["capabilities"]["direct_chat"] = False
