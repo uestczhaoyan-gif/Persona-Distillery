@@ -37,6 +37,7 @@ def _complete_package(package: Path, workspace: Path) -> Path:
     if not package.is_dir():
         raise ValueError("Local package directory is missing")
     for path in (package / ".migration-incomplete.json", package.parent / ".migration.lock",
+                 package / ".backup-incomplete.json", package.parent / ".backup.lock",
                  package / "manifest.json"):
         if path.exists() or path.is_symlink():
             raise ValueError("Incomplete, locked or legacy-aliased package cannot be loaded")

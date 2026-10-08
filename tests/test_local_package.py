@@ -87,6 +87,7 @@ class LocalPackageTests(unittest.TestCase):
 
     def test_incomplete_locked_and_legacy_aliases_are_rejected(self):
         for path in (self.package / ".migration-incomplete.json", self.package.parent / ".migration.lock",
+                     self.package / ".backup-incomplete.json", self.package.parent / ".backup.lock",
                      self.package / "manifest.json"):
             with self.subTest(path=path.name):
                 path.write_text("{}", encoding="utf-8")

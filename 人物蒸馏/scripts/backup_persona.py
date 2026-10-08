@@ -8,16 +8,17 @@ import os
 from pathlib import Path
 import stat
 import sys
+import uuid
 
 from migrate_persona import (ROOT, check_private_location, overlap, package_file,
-                            plain_path, plan_digest, read_json, sha)
+                            plain_path, plan_digest, read_json, sha, copy_verified, write_new)
 from package_policy import ExecutionTarget, authorize_operation, policy_from_manifest
 
 MAX_FILES = 10000
 MAX_BYTES = 10 * 1024 * 1024 * 1024
 
 
-def inventory(package: Path) -> tuple[list[dict], list[str]]:
+def inventory(package: Path, *, skip_incomplete_marker: bool = False) -> tuple[list[dict], list[str]]:
     """Include private raw files and logs for LOCAL backup, without following links."""
     records = []
     folders = []
@@ -36,6 +37,8 @@ def inventory(package: Path) -> tuple[list[dict], list[str]]:
         if len(folders) > MAX_FILES:
             raise ValueError("Backup exceeds directory count limit")
         for name in filenames:
+            if skip_incomplete_marker and Path(current) == package and name == ".backup-incomplete.json":
+                continue
             path = Path(current) / name
             info = path.stat()
             if not stat.S_ISREG(info.st_mode):
@@ -56,7 +59,7 @@ def inventory(package: Path) -> tuple[list[dict], list[str]]:
 
 
 def plan_backup(package: Path, destination_library: Path, *, confirm_local_storage: bool,
-                workspace: Path = ROOT) -> dict:
+                workspace: Path = ROOT, _incomplete_target: Path | None = None) -> dict:
     if confirm_local_storage is not True:
         raise ValueError("Confirm both source and destination are non-synced local storage")
     package = check_private_location(package, workspace)
@@ -81,7 +84,7 @@ def plan_backup(package: Path, destination_library: Path, *, confirm_local_stora
     if package.name != manifest["person_id"]:
         raise ValueError("Backup source directory must match its stable identity")
     target = check_private_location(library / manifest["person_id"], workspace)
-    if target.exists():
+    if target.exists() and target != _incomplete_target:
         raise ValueError("Backup destination already exists; overwriting is not supported")
     # Required declared files must be present; the inventory then also includes
     # undeclared raw/local data so this is a complete private backup, not export.
@@ -97,13 +100,66 @@ def plan_backup(package: Path, destination_library: Path, *, confirm_local_stora
             "notice": "Full private backup includes raw data and logs; never upload or publish it."}
 
 
+def apply_backup(package: Path, destination_library: Path, *, confirm_local_storage: bool,
+                 expected_digest: str, workspace: Path = ROOT) -> dict:
+    plan = plan_backup(package, destination_library, confirm_local_storage=confirm_local_storage,
+                       workspace=workspace)
+    if not isinstance(expected_digest, str) or plan_digest(plan) != expected_digest:
+        raise ValueError("Backup plan changed; review a fresh dry-run before applying")
+    library = check_private_location(destination_library, workspace)
+    library.mkdir(parents=True, exist_ok=True)
+    check_private_location(library, workspace)
+    lock = library / ".backup.lock"
+    token = json.dumps({"pid": os.getpid(), "token": uuid.uuid4().hex}).encode()
+    # Exclusive create: another owner or a stale lock is never overwritten.
+    write_new(lock, token)
+    try:
+        current = plan_backup(package, library, confirm_local_storage=True, workspace=workspace)
+        if plan_digest(current) != expected_digest:
+            raise ValueError("Backup source changed before copying")
+        source, target = Path(plan["source"]), Path(plan["target"])
+        target.mkdir()
+        marker = target / ".backup-incomplete.json"
+        marker_data = json.dumps({"plan_sha256": expected_digest, "state": "incomplete"}).encode()
+        write_new(marker, marker_data)
+        for relative in plan["directories"]:
+            directory = plain_path(target / relative)
+            directory.mkdir(parents=True, exist_ok=True)
+        # Metadata may be copied early, but the incomplete marker blocks loads.
+        for record in plan["files"]:
+            copy_verified(plain_path(source / record["path"]), plain_path(target / record["path"]), record)
+        fresh = plan_backup(source, library, confirm_local_storage=True, workspace=workspace,
+                            _incomplete_target=target)
+        if plan_digest(fresh) != expected_digest:
+            raise ValueError("Backup source changed during copying")
+        check_private_location(target, workspace)
+        copied, folders = inventory(target, skip_incomplete_marker=True)
+        if copied != plan["files"] or folders != plan["directories"] or marker.read_bytes() != marker_data:
+            raise ValueError("Backup verification failed; incomplete copy retained")
+        marker.unlink()
+        return {"ok": True, "status": "local_backup_created", "file_count": len(copied),
+                "total_bytes": plan["total_bytes"], "plan_sha256": expected_digest,
+                "distribution_mode": "local_only"}
+    finally:
+        if plain_path(lock).is_file() and lock.read_bytes() == token:
+            lock.unlink()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("package", type=Path)
     parser.add_argument("destination_library", type=Path)
     parser.add_argument("--confirm-local-storage", action="store_true")
+    parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--expect-plan-sha256")
     args = parser.parse_args(argv)
     try:
+        if args.apply:
+            result = apply_backup(args.package, args.destination_library,
+                                  confirm_local_storage=args.confirm_local_storage,
+                                  expected_digest=args.expect_plan_sha256)
+            print(json.dumps(result))
+            return 0
         plan = plan_backup(args.package, args.destination_library,
                            confirm_local_storage=args.confirm_local_storage)
         # Paths, person identity and inventory are deliberately not printed.

@@ -87,6 +87,66 @@ class LocalBackupTests(unittest.TestCase):
             self.assertNotIn(private, out.getvalue())
         self.assertFalse(self.destination.exists())
 
+    def apply(self, digest):
+        return backup.apply_backup(self.package, self.destination, confirm_local_storage=True,
+                                   expected_digest=digest)
+
+    def test_apply_roundtrip_preserves_every_byte_and_source(self):
+        plan = self.plan()
+        result = self.apply(backup.plan_digest(plan))
+        self.assertEqual(result["status"], "local_backup_created")
+        target = self.destination / "sample"
+        self.assertEqual(backup.inventory(target), backup.inventory(self.package))
+        self.assertFalse((target / ".backup-incomplete.json").exists())
+        self.assertFalse((self.destination / ".backup.lock").exists())
+        loaded = fixtures.loader.load_local_context(target, confirm_local_storage=True, preview=True)
+        self.assertIn("SYNTHETIC", loaded.context)
+        with self.assertRaisesRegex(ValueError, "already exists"):
+            self.apply(backup.plan_digest(plan))
+
+    def test_mismatched_plan_and_existing_lock_do_not_copy(self):
+        with self.assertRaisesRegex(ValueError, "plan changed"):
+            self.apply("0" * 64)
+        self.assertFalse(self.destination.exists())
+        self.destination.mkdir()
+        lock = self.destination / ".backup.lock"
+        lock.write_text("another owner", encoding="utf-8")
+        with self.assertRaises(FileExistsError):
+            self.apply(backup.plan_digest(self.plan()))
+        self.assertEqual(lock.read_text(encoding="utf-8"), "another owner")
+        self.assertFalse((self.destination / "sample").exists())
+
+    def test_interrupted_copy_stays_unloadable_and_does_not_overwrite(self):
+        digest = backup.plan_digest(self.plan())
+        with patch.object(backup, "copy_verified", side_effect=OSError("simulated disk failure")):
+            with self.assertRaises(OSError):
+                self.apply(digest)
+        target = self.destination / "sample"
+        self.assertTrue((target / ".backup-incomplete.json").exists())
+        self.assertFalse((self.destination / ".backup.lock").exists())
+        with self.assertRaisesRegex(ValueError, "Incomplete"):
+            fixtures.loader.load_local_context(target, confirm_local_storage=True, preview=True)
+        with self.assertRaisesRegex(ValueError, "already exists"):
+            self.apply(digest)
+
+    def test_source_edit_during_copy_prevents_completion(self):
+        digest = backup.plan_digest(self.plan())
+        original = backup.copy_verified
+        def changed(source, target, record):
+            original(source, target, record)
+            if record["path"] == "raw/input.txt":
+                source.write_text("MODIFIED AFTER COPY", encoding="utf-8")
+        with patch.object(backup, "copy_verified", side_effect=changed):
+            with self.assertRaisesRegex(ValueError, "source changed"):
+                self.apply(digest)
+        self.assertTrue((self.destination / "sample/.backup-incomplete.json").exists())
+
+    def test_temporary_marker_does_not_consume_the_source_file_limit(self):
+        plan = self.plan()
+        with patch.object(backup, "MAX_FILES", len(plan["files"])):
+            result = self.apply(backup.plan_digest(plan))
+        self.assertEqual(result["file_count"], len(plan["files"]))
+
 
 if __name__ == "__main__":
     unittest.main()
