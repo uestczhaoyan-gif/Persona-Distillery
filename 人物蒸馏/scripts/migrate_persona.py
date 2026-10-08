@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""Read-only v1 -> local v2 migration planning. No copying or model calls."""
+"""Plan or explicitly apply a local-only v1 -> v2 migration. No model calls."""
 from __future__ import annotations
 
 import argparse
 import copy
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import stat
 import sys
+import uuid
 
 from jsonschema import Draft202012Validator, FormatChecker
 
@@ -108,7 +110,8 @@ def needs_private_source(policy: dict) -> bool:
             or bool(set(policy["material_basis"]) & {"authorized_private", "user_recollection"}))
 
 
-def plan_migration(source: Path, library: Path, policy: dict, workspace: Path = ROOT) -> dict:
+def plan_migration(source: Path, library: Path, policy: dict, workspace: Path = ROOT,
+                   *, allow_incomplete: bool = False) -> dict:
     validate(policy, "persona-policy.schema.json")
     if (policy["execution_policy"]["mode"] != "local_only"
             or policy["distribution_policy"]["mode"] != "local_only"):
@@ -127,7 +130,9 @@ def plan_migration(source: Path, library: Path, policy: dict, workspace: Path = 
         raise ValueError("Policy subject kind must match the source identity")
     target = check_private_location(library / manifest["person_id"], workspace)
     if target.exists():
-        raise ValueError("Destination already exists; migration never overwrites a package")
+        marker = target / ".migration-incomplete.json"
+        if not allow_incomplete or not plain_path(marker).is_file():
+            raise ValueError("Destination already exists; migration never overwrites a package")
     proposed = copy.deepcopy(manifest)
     proposed.update(copy.deepcopy(policy))
     proposed.update(schema_version="2.0", visibility="private")
@@ -155,15 +160,129 @@ def plan_migration(source: Path, library: Path, policy: dict, workspace: Path = 
                 relative = (PurePosixPath(index_relative).parent / reference).as_posix()
                 selected[relative] = package_file(source, relative)
     names = [name.casefold() for name in selected]
-    if len(set(names)) != len(names) or any(n in {"manifest.json", "manifest.v2.json", "05-dialogue-log.md"} for n in names):
+    if len(set(names)) != len(names) or any(n in {"manifest.json", "manifest.v2.json", "05-dialogue-log.md", "migration-report.json"} for n in names):
         raise ValueError("Copy paths collide with generated migration files")
     inventory = [{"path": name, "bytes": path.stat().st_size, "sha256": sha(path)}
                  for name, path in sorted(selected.items())]
     return {"plan_version": "1.0", "dry_run": True, "source": str(source), "target": str(target),
             "source_manifest_sha256": sha(manifest_file), "proposed_manifest": proposed,
-            "copy_files": inventory, "generated_files": ["manifest.v2.json", "05-dialogue-log.md"],
+            "copy_files": inventory, "generated_files": ["manifest.v2.json", "05-dialogue-log.md", "migration-report.json"],
             "omitted_roles": sorted(OMITTED_ROLES & manifest["files"].keys()),
             "storage_notice": "Known sync paths checked; confirm no other backup/sync service monitors this location."}
+
+
+def canonical(value: dict) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def plan_digest(plan: dict) -> str:
+    return hashlib.sha256(canonical(plan).encode("utf-8")).hexdigest()
+
+
+def write_new(path: Path, data: bytes) -> None:
+    with path.open("xb") as handle:
+        handle.write(data)
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+def copy_verified(source: Path, target: Path, record: dict) -> None:
+    """Never overwrite; a failed copy stays incomplete and is not loadable."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    plain_path(target)
+    digest = hashlib.sha256()
+    count = 0
+    with source.open("rb") as inp, target.open("xb") as out:
+        for block in iter(lambda: inp.read(1024 * 1024), b""):
+            count += len(block)
+            if count > record["bytes"]:
+                raise ValueError("Source changed while copying")
+            out.write(block)
+            digest.update(block)
+        out.flush()
+        os.fsync(out.fileno())
+    if count != record["bytes"] or digest.hexdigest() != record["sha256"]:
+        raise ValueError("Source changed while copying")
+
+
+def apply_migration(source: Path, library: Path, policy: dict, expected_digest: str,
+                    confirm_local_storage: bool, workspace: Path = ROOT, *, resume: bool = False) -> dict:
+    if confirm_local_storage is not True:
+        raise ValueError("Explicit local storage confirmation is required")
+    if not isinstance(expected_digest, str) or len(expected_digest) != 64:
+        raise ValueError("Provide the plan_sha256 from a successful dry-run")
+    plan = plan_migration(source, library, policy, workspace, allow_incomplete=resume)
+    if plan_digest(plan) != expected_digest:
+        raise ValueError("Migration plan changed; inspect a new dry-run before applying")
+    if resume and not Path(plan["target"]).exists():
+        raise ValueError("No incomplete migration exists to resume")
+    library = check_private_location(library, workspace)
+    library.mkdir(parents=True, exist_ok=True)
+    check_private_location(library, workspace)
+    lock = library / ".migration.lock"
+    token = canonical({"token": uuid.uuid4().hex, "pid": os.getpid(),
+                       "created_at": datetime.now(timezone.utc).isoformat()}).encode("utf-8")
+    try:
+        write_new(lock, token)
+    except FileExistsError:
+        raise ValueError("Migration is locked; inspect the active process before recovery") from None
+    try:
+        # Recheck after obtaining the lock; a concurrent run may have finished.
+        plan = plan_migration(source, library, policy, workspace, allow_incomplete=resume)
+        if plan_digest(plan) != expected_digest:
+            raise ValueError("Migration plan changed before writing")
+        source = Path(plan["source"])
+        target = check_private_location(Path(plan["target"]), workspace)
+        marker = target / ".migration-incomplete.json"
+        marker_data = {"plan_sha256": expected_digest, "state": "incomplete"}
+        if resume:
+            if not target.exists() or read_json(plain_path(marker)) != marker_data:
+                raise ValueError("Incomplete migration marker does not match this plan")
+        else:
+            target.mkdir(exist_ok=False)
+            write_new(marker, canonical(marker_data).encode("utf-8"))
+        allowed = {item["path"] for item in plan["copy_files"]} | set(plan["generated_files"]) | {marker.name}
+        for path in target.rglob("*"):
+            plain_path(path)
+            if path.is_file() and path.relative_to(target).as_posix() not in allowed:
+                raise ValueError("Incomplete destination contains unexpected files; left untouched")
+        for record in plan["copy_files"]:
+            destination = plain_path(target / record["path"])
+            if destination.exists():
+                if not destination.is_file() or sha(destination) != record["sha256"]:
+                    raise ValueError("Incomplete destination file differs; left untouched")
+            else:
+                copy_verified(package_file(source, record["path"]), destination, record)
+        # Re-hash the source to catch edits made during a long copy.
+        current = plan_migration(source, library, policy, workspace, allow_incomplete=True)
+        if plan_digest(current) != expected_digest:
+            raise ValueError("Source changed during migration; destination remains incomplete")
+        generated = {
+            "05-dialogue-log.md": "# 本地对话日志\n\n迁移未复制旧会话。默认不保存完整对话。\n",
+            "migration-report.json": canonical({"plan_sha256": expected_digest,
+                "source_manifest_sha256": plan["source_manifest_sha256"],
+                "copy_files": plan["copy_files"], "omitted_roles": plan["omitted_roles"],
+                "source_preserved": True}) + "\n",
+            "manifest.v2.json": json.dumps(plan["proposed_manifest"], ensure_ascii=False, indent=2) + "\n",
+        }
+        for name, text in generated.items():
+            destination = plain_path(target / name)
+            data = text.encode("utf-8")
+            if destination.exists():
+                if destination.read_bytes() != data:
+                    raise ValueError("Generated destination metadata differs; left untouched")
+            else:
+                write_new(destination, data)
+        # All future v2 readers must reject this marker, even if manifest exists.
+        if read_json(plain_path(marker)) != marker_data:
+            raise ValueError("Migration marker changed; refusing to complete")
+        marker.unlink()
+        return {"ok": True, "dry_run": False, "plan_sha256": expected_digest,
+                "copy_file_count": len(plan["copy_files"]), "source_preserved": True,
+                "status": "local_package_created", "runtime_available": False}
+    finally:
+        if plain_path(lock).is_file() and lock.read_bytes() == token:
+            lock.unlink()
 
 
 def main() -> int:
@@ -172,10 +291,25 @@ def main() -> int:
     parser.add_argument("--library", type=Path, required=True)
     parser.add_argument("--policy", type=Path, required=True)
     parser.add_argument("--show-plan", action="store_true", help="Show local metadata, including identity and paths; never share private output")
+    parser.add_argument("--apply", action="store_true", help="Explicitly create the local package after dry-run")
+    parser.add_argument("--expect-plan-sha256")
+    parser.add_argument("--confirm-local-storage", action="store_true")
+    parser.add_argument("--resume", action="store_true", help="Resume only an unchanged, incomplete migration")
     args = parser.parse_args()
     try:
-        result = plan_migration(args.source, args.library, read_json(plain_path(args.policy)))
+        policy = read_json(plain_path(args.policy))
+        if args.apply:
+            if args.show_plan:
+                raise ValueError("--show-plan is only available for dry-run")
+            result = apply_migration(args.source, args.library, policy, args.expect_plan_sha256,
+                                     args.confirm_local_storage, resume=args.resume)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
+        if args.resume or args.confirm_local_storage or args.expect_plan_sha256:
+            raise ValueError("Apply options require --apply")
+        result = plan_migration(args.source, args.library, policy)
         output = result if args.show_plan else {"ok": True, "dry_run": True,
+            "plan_sha256": plan_digest(result),
             "copy_file_count": len(result["copy_files"]), "generated_files": result["generated_files"],
             "omitted_roles": result["omitted_roles"], "storage_notice": result["storage_notice"]}
         print(json.dumps(output, ensure_ascii=False, indent=2))

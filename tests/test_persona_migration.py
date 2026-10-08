@@ -6,6 +6,8 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import subprocess
+import sys
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -49,6 +51,115 @@ class MigrationPlanTests(unittest.TestCase):
 
     def plan(self):
         return migration.plan_migration(self.source, self.library, self.policy, self.workspace)
+
+    def apply(self, digest, *, resume=False, confirmed=True):
+        return migration.apply_migration(self.source, self.library, self.policy, digest,
+                                          confirmed, self.workspace, resume=resume)
+
+    def test_apply_requires_explicit_confirmation_and_matching_plan(self):
+        digest = migration.plan_digest(self.plan())
+        with self.assertRaisesRegex(ValueError, "confirmation"):
+            self.apply(digest, confirmed=False)
+        with self.assertRaisesRegex(ValueError, "plan changed"):
+            self.apply("0" * 64)
+        self.assertFalse(self.library.exists())
+
+    def test_apply_copies_verified_files_and_preserves_source(self):
+        plan = self.plan()
+        before = {p.relative_to(self.source): p.read_bytes() for p in self.source.rglob("*") if p.is_file()}
+        result = self.apply(migration.plan_digest(plan))
+        target = self.library / "sample"
+        self.assertTrue(result["source_preserved"])
+        self.assertFalse(result["runtime_available"])
+        self.assertFalse((target / "manifest.json").exists())
+        self.assertFalse((target / ".migration-incomplete.json").exists())
+        self.assertFalse((self.library / ".migration.lock").exists())
+        self.assertEqual(json.loads((target / "manifest.v2.json").read_text(encoding="utf-8")), plan["proposed_manifest"])
+        for record in plan["copy_files"]:
+            self.assertEqual(migration.sha(target / record["path"]), record["sha256"])
+        self.assertNotIn("ORIGINAL FIXTURE BODY", (target / "05-dialogue-log.md").read_text(encoding="utf-8"))
+        after = {p.relative_to(self.source): p.read_bytes() for p in self.source.rglob("*") if p.is_file()}
+        self.assertEqual(before, after)
+        with self.assertRaisesRegex(ValueError, "already exists"):
+            self.apply(migration.plan_digest(plan))
+
+    def test_source_edit_after_preflight_is_rejected_without_writes(self):
+        digest = migration.plan_digest(self.plan())
+        (self.source / self.manifest["files"]["profile"]).write_text("Changed fixture", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "plan changed"):
+            self.apply(digest)
+        self.assertFalse(self.library.exists())
+
+    def test_interrupted_run_resumes_only_matching_verified_files(self):
+        digest = migration.plan_digest(self.plan())
+        original = migration.copy_verified
+        calls = []
+        def interrupt(source, target, record):
+            calls.append(record["path"])
+            if len(calls) == 2:
+                raise OSError("Simulated interruption")
+            original(source, target, record)
+        with patch.object(migration, "copy_verified", side_effect=interrupt):
+            with self.assertRaises(OSError):
+                self.apply(digest)
+        target = self.library / "sample"
+        self.assertTrue((target / ".migration-incomplete.json").exists())
+        self.assertFalse((target / "manifest.v2.json").exists())
+        self.assertFalse((self.library / ".migration.lock").exists())
+        self.assertTrue(self.apply(digest, resume=True)["ok"])
+
+    def test_resume_does_not_overwrite_edited_or_unexpected_files(self):
+        digest = migration.plan_digest(self.plan())
+        with patch.object(migration, "copy_verified", side_effect=OSError("Interrupted")):
+            with self.assertRaises(OSError):
+                self.apply(digest)
+        target = self.library / "sample"
+        unexpected = target / "user-notes.txt"
+        unexpected.write_text("User fixture", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "unexpected"):
+            self.apply(digest, resume=True)
+        self.assertEqual(unexpected.read_text(encoding="utf-8"), "User fixture")
+        unexpected.unlink()
+        edited = target / self.manifest["files"]["profile"]
+        edited.write_text("User edit", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "differs"):
+            self.apply(digest, resume=True)
+        self.assertEqual(edited.read_text(encoding="utf-8"), "User edit")
+
+    def test_existing_lock_blocks_without_touching_target(self):
+        digest = migration.plan_digest(self.plan())
+        self.library.mkdir()
+        lock = self.library / ".migration.lock"
+        lock.write_text("other process", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "locked"):
+            self.apply(digest)
+        self.assertFalse((self.library / "sample").exists())
+        self.assertEqual(lock.read_text(encoding="utf-8"), "other process")
+
+    def test_partial_generated_metadata_remains_unloadable(self):
+        digest = migration.plan_digest(self.plan())
+        original = migration.write_new
+        def interrupt(path, data):
+            if path.name == "manifest.v2.json":
+                raise OSError("Manifest write interrupted")
+            original(path, data)
+        with patch.object(migration, "write_new", side_effect=interrupt):
+            with self.assertRaises(OSError):
+                self.apply(digest)
+        self.assertTrue((self.library / "sample/.migration-incomplete.json").exists())
+        self.assertTrue(self.apply(digest, resume=True)["ok"])
+
+    def test_source_edit_during_copy_keeps_destination_incomplete(self):
+        digest = migration.plan_digest(self.plan())
+        original = migration.copy_verified
+        def change(source, target, record):
+            original(source, target, record)
+            source.write_text("Changed during copy", encoding="utf-8")
+        with patch.object(migration, "copy_verified", side_effect=change):
+            with self.assertRaisesRegex(ValueError, "Source changed"):
+                self.apply(digest)
+        self.assertTrue((self.library / "sample/.migration-incomplete.json").exists())
+        self.assertFalse((self.library / "sample/manifest.v2.json").exists())
 
     def test_plan_is_read_only_and_omits_logs_raw_and_example(self):
         before = {p.relative_to(self.base): p.read_bytes() for p in self.base.rglob("*") if p.is_file()}
@@ -174,3 +285,18 @@ class MigrationPlanTests(unittest.TestCase):
             self.assertNotIn(str(self.source), output)
             self.assertNotIn("ORIGINAL FIXTURE BODY", output)
             self.assertTrue(json.loads(output)["dry_run"])
+
+    def test_real_cli_dry_run_then_apply_round_trip(self):
+        policy_file = self.base / "policy.json"
+        policy_file.write_text(json.dumps(self.policy), encoding="utf-8")
+        command = [sys.executable, str(ROOT / "人物蒸馏/scripts/migrate_persona.py"),
+                   str(self.source), "--library", str(self.library), "--policy", str(policy_file)]
+        env = {**os.environ, "PYTHONUTF8": "1"}
+        result = subprocess.run(command, capture_output=True, encoding="utf-8", env=env, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        digest = json.loads(result.stdout)["plan_sha256"]
+        result = subprocess.run(command + ["--apply", "--confirm-local-storage", "--expect-plan-sha256", digest],
+                                capture_output=True, encoding="utf-8", env=env, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(json.loads(result.stdout)["status"], "local_package_created")
+        self.assertNotIn("PRIVATE FIXTURE IDENTITY", result.stdout)
