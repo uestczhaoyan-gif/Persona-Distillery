@@ -103,6 +103,8 @@ def validate_config(job: dict, root: Path) -> None:
     errors = list(Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(job))
     if errors:
         raise ValueError("Invalid job configuration at " + "/".join(map(str, errors[0].absolute_path)))
+    if job["subject"]["kind"] in {"living_public", "living_private", "deceased_private", "self"}:
+        raise ValueError("Use the external local v2 job entry for this subject; legacy workspace storage is not supported")
     if job["input"]["mode"] != "upload":
         raise ValueError("This runner supports local upload mode only")
     if job["input"]["upload"].get("participant_map_file"):

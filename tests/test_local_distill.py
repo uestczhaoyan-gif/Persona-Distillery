@@ -195,6 +195,9 @@ class LocalDistillationTests(unittest.TestCase):
         self.assertIn("[EMAIL_REDACTED]", text)
         self.assertNotIn("test@example.com", text)
         self.assertNotIn("SYNTHETIC-TEST-ONLY", text)
+        effective = json.loads((self.snapshot(state) / "policy.json").read_text(encoding="utf-8"))
+        self.assertTrue(effective["sensitive_data"])
+        self.assertFalse(self.load()[0]["policy"]["sensitive_data"])
 
     def test_duplicate_corrupt_and_unsupported_inputs_are_reported(self):
         (self.incoming / "copy.txt").write_bytes((self.incoming / "source.txt").read_bytes())

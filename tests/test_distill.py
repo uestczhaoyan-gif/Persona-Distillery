@@ -127,13 +127,14 @@ class LocalDistillTests(unittest.TestCase):
         report = self.report(self.build())
         self.assertIn("credential_requires_clean_input", [r["reason"] for r in report["quarantined"]])
 
-    def test_living_subject_requires_real_consent_record(self):
-        self.job["subject"]["kind"] = "living_private"
-        self.job["consent"] = {"status": "granted", "record_file": "consent.private.md"}
-        self.write_config()
-        self.start()
-        self.approval("identity")
-        self.assertEqual(self.build()["status"], "consent_review")
+    def test_private_subjects_use_external_v2_even_with_legacy_consent(self):
+        for kind in ("living_public", "living_private", "deceased_private", "self"):
+            self.job["subject"]["kind"] = kind
+            self.job["consent"] = {"status": "granted", "record_file": "consent.private.md"}
+            self.write_config()
+            with self.subTest(kind=kind), self.assertRaisesRegex(ValueError, "external local v2"):
+                self.start()
+            self.assertFalse(distill.run_dir(self.job["job"]["id"], self.root).exists())
 
     def test_frozen_config_and_paths_cannot_be_modified(self):
         self.start()

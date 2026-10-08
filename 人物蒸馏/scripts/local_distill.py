@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager
+import copy
 import csv
 from datetime import date
 import io
@@ -360,8 +361,10 @@ def build(library: Path, job_id: str, *, confirm_local_storage: bool,
                   "withdrawn_source_ids": sorted(set(state.get("active_source_ids", [])) - set(active))}
         review = {"material_declaration": job["material_declaration"], "approvals": state["approvals"],
                   "input_fingerprint": fingerprint, "config_sha256": state["config_sha256"]}
+        effective_policy = copy.deepcopy(job["policy"])
+        effective_policy["sensitive_data"] = effective_policy["sensitive_data"] or bool(findings)
         for name, value in (("inventory.private.json", entries), ("report.json", report),
-                            ("policy.json", job["policy"]), ("review.json", review)):
+                            ("policy.json", effective_policy), ("review.json", review)):
             write_new(snapshot / name, (canonical(value) + "\n").encode("utf-8"))
         checksums = {path.name: sha(path) for path in snapshot.iterdir()}
         write_new(snapshot / "checksums.json", (canonical(checksums) + "\n").encode("utf-8"))
