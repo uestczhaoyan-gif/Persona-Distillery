@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only backup planning for an entire local-only v2 package. No export."""
+"""Plan or explicitly copy an entire local-only v2 package. No public export."""
 from __future__ import annotations
 
 import argparse
