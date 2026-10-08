@@ -1,5 +1,6 @@
 """Real loopback transport, synthetic v2 data; no actual model inference."""
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import io
 import json
 from pathlib import Path
 import threading
@@ -8,6 +9,7 @@ from unittest.mock import patch
 
 import test_local_package as fixtures
 import local_chat
+import local_persona
 
 
 class LocalChatTests(unittest.TestCase):
@@ -113,6 +115,46 @@ class LocalChatTests(unittest.TestCase):
         self.assertEqual(len(session._messages), 3)
         session.reset()
         self.assertEqual(len(session._messages), 1)
+
+    def cli(self, text, *, terminal=True, confirmed=True):
+        class Terminal(io.StringIO):
+            def isatty(self):
+                return terminal
+        out, err = Terminal(), Terminal()
+        args = [str(self.package), "--model", "synthetic-local", "--base-url", self.url, "--preview"]
+        if confirmed:
+            args.extend(["--confirm-local-storage", "--confirm-local-model"])
+        with patch("sys.stdin", Terminal(text)), patch("sys.stdout", out), patch("sys.stderr", err):
+            code = local_persona.main(args)
+        return code, out.getvalue(), err.getvalue()
+
+    def test_cli_conversation_reset_and_exit_with_no_persistence(self):
+        before = {p.name: p.read_bytes() for p in self.package.iterdir()}
+        code, out, err = self.cli("PRIVATE FIRST QUESTION\n/new\nPRIVATE SECOND QUESTION\n/exit\n")
+        self.assertEqual(code, 0)
+        self.assertIn("不是本人", err)
+        self.assertEqual(out.count("Synthetic local response"), 2)
+        chats = [data for path, data in self.requests if path == "/api/chat"]
+        self.assertEqual(len(chats), 2)
+        self.assertNotIn("PRIVATE FIRST QUESTION", json.dumps(chats[1]))
+        self.assertEqual(before, {p.name: p.read_bytes() for p in self.package.iterdir()})
+
+    def test_cli_refuses_pipes_before_loading_or_contacting_model(self):
+        with patch.object(local_chat, "load_local_context", side_effect=AssertionError("private body read")):
+            code, out, err = self.cli("PRIVATE QUESTION", terminal=False)
+        self.assertEqual(code, 1)
+        self.assertEqual(out, "")
+        self.assertNotIn("PRIVATE QUESTION", err)
+        self.assertEqual(self.requests, [])
+
+    def test_cli_missing_confirmation_and_save_command_do_not_send_questions(self):
+        code, _, _ = self.cli("PRIVATE QUESTION", confirmed=False)
+        self.assertEqual(code, 1)
+        self.assertEqual(self.requests, [])
+        code, out, _ = self.cli("/save PRIVATE QUESTION\n/exit\n")
+        self.assertEqual(code, 0)
+        self.assertNotIn("PRIVATE QUESTION", out)
+        self.assertTrue(all(path == "/api/show" for path, _ in self.requests))
 
 
 if __name__ == "__main__":
