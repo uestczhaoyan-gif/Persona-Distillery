@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/persona-distill/schemas/persona-policy.schema.json",
+  "title": "Persona execution and distribution policy (standalone contract)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["policy_version", "subject_kind", "sensitive_data", "material_basis", "execution_policy", "distribution_policy", "review_status"],
+  "properties": {
+    "policy_version": {"const": "1.0"},
+    "subject_kind": {"enum": ["historical_public", "deceased_private", "living_public", "living_private", "self", "fictional"]},
+    "sensitive_data": {"type": "boolean"},
+    "material_basis": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": {"enum": ["public_source", "self_report", "user_recollection", "authorized_private", "original_fiction"]}
+    },
+    "execution_policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["mode", "allowed_services"],
+      "properties": {
+        "mode": {"enum": ["local_only", "declared_services"]},
+        "allowed_services": {
+          "type": "array", "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{1,63}$"}
+        }
+      },
+      "allOf": [
+        {"if": {"properties": {"mode": {"const": "local_only"}}}, "then": {"properties": {"allowed_services": {"maxItems": 0}}}},
+        {"if": {"properties": {"mode": {"const": "declared_services"}}}, "then": {"properties": {"allowed_services": {"minItems": 1}}}}
+      ]
+    },
+    "distribution_policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {"mode": {"enum": ["local_only", "review_required", "public_approved"]}}
+    },
+    "review_status": {"enum": ["candidate", "reviewed"]},
+    "publication_review": {
+      "type": "object", "additionalProperties": false,
+      "required": ["record_id", "reviewer_id", "reviewed_on", "content_digest"],
+      "properties": {
+        "record_id": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{1,127}$"},
+        "reviewer_id": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{1,127}$"},
+        "reviewed_on": {"type": "string", "format": "date"},
+        "content_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"anyOf": [
+        {"properties": {"subject_kind": {"enum": ["living_public", "living_private", "deceased_private"]}}},
+        {"properties": {"sensitive_data": {"const": true}}},
+        {"properties": {"material_basis": {"contains": {"enum": ["authorized_private", "user_recollection"]}}}}
+      ]},
+      "then": {"properties": {
+        "execution_policy": {"properties": {"mode": {"const": "local_only"}}},
+        "distribution_policy": {"properties": {"mode": {"const": "local_only"}}}
+      }}
+    },
+    {
+      "if": {"properties": {"distribution_policy": {"properties": {"mode": {"const": "local_only"}}}}},
+      "then": {"properties": {"execution_policy": {"properties": {"mode": {"const": "local_only"}}}}}
+    },
+    {
+      "if": {"properties": {"distribution_policy": {"properties": {"mode": {"const": "public_approved"}}}}},
+      "then": {"required": ["publication_review"], "properties": {"review_status": {"const": "reviewed"}}},
+      "else": {"not": {"required": ["publication_review"]}}
+    }
+  ]
+}
