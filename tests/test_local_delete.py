@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import test_local_package as fixtures
 import delete_persona as deletion
+import backup_persona as backup
 
 
 class LocalDeletionTests(unittest.TestCase):
@@ -77,6 +78,77 @@ class LocalDeletionTests(unittest.TestCase):
         self.assertTrue(json.loads(out.getvalue())["dry_run"])
         with contextlib.redirect_stderr(err), patch.object(deletion, "plan_delete", side_effect=AssertionError("body read")):
             self.assertEqual(deletion.main([*args, "--show-plan"]), 1)
+
+    def apply(self, digest, *, confirmed=True):
+        return deletion.apply_delete(self.package, confirm_local_storage=True,
+                                     confirm_delete=confirmed, expected_digest=digest)
+
+    def test_apply_deletes_only_reviewed_package_and_leaves_external_file(self):
+        plan = self.plan()
+        result = self.apply(deletion.plan_digest(plan))
+        self.assertEqual(result["status"], "local_package_deleted")
+        self.assertEqual(result["deleted_files"], len(plan["files"]))
+        self.assertFalse(result["secure_erasure"])
+        self.assertFalse(self.package.exists())
+        self.assertTrue(self.package.parent.is_dir())
+        self.assertEqual(self.outside.read_text(encoding="utf-8"), "OUTSIDE FIXTURE")
+        self.assertFalse((self.package.parent / ".deletion.lock").exists())
+
+    def test_confirmation_and_changed_plan_prevent_any_deletion(self):
+        digest = deletion.plan_digest(self.plan())
+        with self.assertRaisesRegex(ValueError, "confirmation"):
+            self.apply(digest, confirmed=False)
+        (self.package / "new.txt").write_text("NEW", encoding="utf-8")
+        with patch.object(deletion, "delete_verified_file", side_effect=AssertionError("deleted")):
+            with self.assertRaisesRegex(ValueError, "plan changed"):
+                self.apply(digest)
+        self.assertTrue((self.package / "new.txt").exists())
+        self.assertFalse((self.package / ".deletion-incomplete.json").exists())
+
+    def test_interrupted_deletion_is_unloadable_and_unbackupable(self):
+        digest = deletion.plan_digest(self.plan())
+        with patch.object(deletion, "delete_verified_file", side_effect=OSError("disk error")):
+            with self.assertRaises(OSError):
+                self.apply(digest)
+        marker = self.package / ".deletion-incomplete.json"
+        self.assertTrue(marker.is_file())
+        self.assertEqual(json.loads(marker.read_text(encoding="utf-8"))["plan_sha256"], digest)
+        with self.assertRaisesRegex(ValueError, "Incomplete"):
+            fixtures.loader.load_local_context(self.package, confirm_local_storage=True, preview=True)
+        with self.assertRaisesRegex(ValueError, "Incomplete"):
+            backup.plan_backup(self.package, self.base / "new-backup", confirm_local_storage=True)
+        self.assertFalse((self.package.parent / ".deletion.lock").exists())
+
+    def test_mid_delete_edit_is_preserved_and_marker_remains(self):
+        digest = deletion.plan_digest(self.plan())
+        original = deletion.delete_verified_file
+        def edited(package, record):
+            if record["path"] == "raw/private.txt":
+                (package / record["path"]).write_text("NEW PRIVATE CONTENT", encoding="utf-8")
+            original(package, record)
+        with patch.object(deletion, "delete_verified_file", side_effect=edited):
+            with self.assertRaisesRegex(ValueError, "changed before deletion"):
+                self.apply(digest)
+        self.assertEqual((self.package / "raw/private.txt").read_text(encoding="utf-8"), "NEW PRIVATE CONTENT")
+        self.assertTrue((self.package / ".deletion-incomplete.json").is_file())
+
+    def test_unlisted_new_file_is_never_removed(self):
+        digest = deletion.plan_digest(self.plan())
+        original = deletion.delete_verified_file
+        def extra(package, record):
+            original(package, record)
+            (package / "unexpected.txt").write_text("PRESERVE", encoding="utf-8")
+        with patch.object(deletion, "delete_verified_file", side_effect=extra):
+            with self.assertRaisesRegex(ValueError, "Unexpected"):
+                self.apply(digest)
+        self.assertEqual((self.package / "unexpected.txt").read_text(encoding="utf-8"), "PRESERVE")
+        self.assertTrue((self.package / ".deletion-incomplete.json").is_file())
+
+    def test_deletion_path_refuses_escape_and_root(self):
+        for relative in ("../outside-private.txt", str(self.outside), ".", "raw/../../outside-private.txt"):
+            with self.subTest(relative=relative), self.assertRaises(ValueError):
+                deletion.deletion_path(self.package, relative)
+        self.assertTrue(self.outside.exists())
 
 
 if __name__ == "__main__":

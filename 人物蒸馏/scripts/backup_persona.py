@@ -68,7 +68,8 @@ def plan_backup(package: Path, destination_library: Path, *, confirm_local_stora
         raise ValueError("Backup source must exist and be separate from its destination")
     blocked = (package / "manifest.json", package / ".migration-incomplete.json",
                package / ".backup-incomplete.json", package.parent / ".migration.lock",
-               package.parent / ".backup.lock")
+               package.parent / ".backup.lock", package / ".deletion-incomplete.json",
+               package.parent / ".deletion.lock")
     if any(path.exists() or path.is_symlink() for path in blocked):
         raise ValueError("Incomplete, locked or legacy-aliased source cannot be backed up")
     header_path = package_file(package, "manifest.v2.json")

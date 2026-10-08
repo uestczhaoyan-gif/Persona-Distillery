@@ -16,7 +16,7 @@ FUTURE_POLICY_FIELDS = frozenset({
     "policy_version", "sensitive_data", "publication_review",
 })
 POLICY_FIELDS = FUTURE_POLICY_FIELDS | {"subject_kind"}
-OPERATIONS = frozenset({"read", "infer", "search", "ocr", "transcribe", "generate_avatar", "backup"})
+OPERATIONS = frozenset({"read", "infer", "search", "ocr", "transcribe", "generate_avatar", "backup", "delete"})
 
 
 class PolicyError(ValueError):
@@ -73,7 +73,7 @@ def authorize_operation(policies: list[dict], operation: str, target: ExecutionT
         if (not target.network_enabled or not isinstance(target.service_id, str)
                 or not re.fullmatch(r"[a-z0-9][a-z0-9_-]{1,63}", target.service_id)):
             raise PolicyError("Invalid declared service target")
-        if operation == "backup" or effective["execution_mode"] == "local_only":
+        if operation in {"backup", "delete"} or effective["execution_mode"] == "local_only":
             raise PolicyError("Local-only operation cannot send content to a service")
         if target.service_id not in effective["allowed_services"]:
             raise PolicyError("Service is not allowed by every participant policy")

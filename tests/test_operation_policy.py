@@ -78,6 +78,8 @@ class OperationPolicyTests(unittest.TestCase):
             policy.authorize_operation([value], "export_public", policy.ExecutionTarget("local", False))
         with self.assertRaises(policy.PolicyError):
             policy.authorize_operation([value], "backup", policy.ExecutionTarget("service", True, "example_llm"))
+        with self.assertRaises(policy.PolicyError):
+            policy.authorize_operation([value], "delete", policy.ExecutionTarget("service", True, "example_llm"))
 
     def test_empty_malformed_and_unknown_policy_fail_closed(self):
         for policies in ([], {}, [None], [dict(local(), policy_version="2.0")]):
