@@ -101,7 +101,8 @@ class PersonaEntryTests(unittest.TestCase):
                         self.assertEqual([c.args[1] for c in checking.call_args_list], ["manifest.json"])
 
     def test_future_policy_cannot_be_silently_downgraded_to_v1(self):
-        for field in ("execution_policy", "distribution_policy", "material_basis", "review_status"):
+        for field in ("execution_policy", "distribution_policy", "material_basis", "review_status",
+                      "policy_version", "sensitive_data", "publication_review"):
             with self.subTest(field=field):
                 self.manifest[field] = "local_only"
                 self.save_manifest()

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 FUTURE_POLICY_FIELDS = frozenset({
     "execution_policy", "distribution_policy", "material_basis", "review_status",
+    "policy_version", "sensitive_data", "publication_review",
 })
 
 
