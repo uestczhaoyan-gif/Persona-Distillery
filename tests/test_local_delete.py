@@ -79,9 +79,9 @@ class LocalDeletionTests(unittest.TestCase):
         with contextlib.redirect_stderr(err), patch.object(deletion, "plan_delete", side_effect=AssertionError("body read")):
             self.assertEqual(deletion.main([*args, "--show-plan"]), 1)
 
-    def apply(self, digest, *, confirmed=True):
+    def apply(self, digest, *, confirmed=True, resume=False):
         return deletion.apply_delete(self.package, confirm_local_storage=True,
-                                     confirm_delete=confirmed, expected_digest=digest)
+                                     confirm_delete=confirmed, expected_digest=digest, resume=resume)
 
     def test_apply_deletes_only_reviewed_package_and_leaves_external_file(self):
         plan = self.plan()
@@ -149,6 +149,92 @@ class LocalDeletionTests(unittest.TestCase):
             with self.subTest(relative=relative), self.assertRaises(ValueError):
                 deletion.deletion_path(self.package, relative)
         self.assertTrue(self.outside.exists())
+
+    def interrupt_after_one_file(self):
+        plan = self.plan()
+        digest = deletion.plan_digest(plan)
+        original = deletion.delete_verified_file
+        count = []
+        def interrupted(package, record):
+            count.append(True)
+            if len(count) == 2:
+                raise OSError("Simulated interruption")
+            original(package, record)
+        with patch.object(deletion, "delete_verified_file", side_effect=interrupted):
+            with self.assertRaises(OSError):
+                self.apply(digest)
+        return plan, digest
+
+    def test_resume_only_removes_unchanged_remaining_files(self):
+        plan, digest = self.interrupt_after_one_file()
+        original, remaining, _, _ = deletion.resume_state(self.package, digest, confirm_local_storage=True)
+        self.assertEqual(original, plan)
+        self.assertEqual(len(remaining), len(plan["files"]) - 1)
+        result = self.apply(digest, resume=True)
+        self.assertEqual(result["deleted_files"], len(remaining))
+        self.assertFalse(self.package.exists())
+        self.assertTrue(self.outside.exists())
+
+    def test_resume_rejects_edited_or_unlisted_content_before_any_mutation(self):
+        _, digest = self.interrupt_after_one_file()
+        extra = self.package / "unexpected.txt"
+        extra.write_text("PRESERVE", encoding="utf-8")
+        with patch.object(deletion, "delete_verified_file", side_effect=AssertionError("deleted")):
+            with self.assertRaisesRegex(ValueError, "Changed or unlisted"):
+                self.apply(digest, resume=True)
+        self.assertTrue(extra.exists())
+        extra.unlink()
+        (self.package / "raw/private.txt").write_text("CHANGED", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "Changed or unlisted"):
+            self.apply(digest, resume=True)
+
+    def test_tampered_journal_or_wrong_hash_does_not_authorize_resume(self):
+        _, digest = self.interrupt_after_one_file()
+        with self.assertRaisesRegex(ValueError, "original approved hash"):
+            self.apply("0" * 64, resume=True)
+        marker = self.package / ".deletion-incomplete.json"
+        state = json.loads(marker.read_text(encoding="utf-8"))
+        state["plan"]["files"][0]["path"] = "../outside-private.txt"
+        marker.write_text(json.dumps(state), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "original approved hash"):
+            self.apply(digest, resume=True)
+        self.assertTrue(self.outside.exists())
+
+    def test_resume_works_after_manifest_deleted_and_directory_cleanup_interrupted(self):
+        from pathlib import Path
+        digest = deletion.plan_digest(self.plan())
+        original = Path.rmdir
+        def interrupted(path):
+            if path == self.package / "raw/empty":
+                raise OSError("Simulated directory cleanup failure")
+            return original(path)
+        with patch.object(Path, "rmdir", interrupted):
+            with self.assertRaises(OSError):
+                self.apply(digest)
+        self.assertFalse((self.package / "manifest.v2.json").exists())
+        result = self.apply(digest, resume=True)
+        self.assertEqual(result["deleted_files"], 0)
+        self.assertFalse(self.package.exists())
+
+    def test_resume_preview_cli_reports_remaining_counts_without_deleting(self):
+        plan, digest = self.interrupt_after_one_file()
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = deletion.main([str(self.package), "--confirm-local-storage", "--resume",
+                                  "--expect-plan-sha256", digest])
+        self.assertEqual(code, 0)
+        result = json.loads(out.getvalue())
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["file_count"], len(plan["files"]) - 1)
+        self.assertTrue(self.package.exists())
+        self.assertNotIn(str(self.package), out.getvalue())
+        applied = io.StringIO()
+        with contextlib.redirect_stdout(applied):
+            code = deletion.main([str(self.package), "--confirm-local-storage", "--resume", "--apply",
+                                  "--confirm-delete", "--expect-plan-sha256", digest])
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(applied.getvalue())["status"], "local_package_deleted")
+        self.assertFalse(self.package.exists())
 
 
 if __name__ == "__main__":

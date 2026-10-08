@@ -18,7 +18,8 @@ MAX_FILES = 10000
 MAX_BYTES = 10 * 1024 * 1024 * 1024
 
 
-def inventory(package: Path, *, skip_incomplete_marker: bool = False) -> tuple[list[dict], list[str]]:
+def inventory(package: Path, *, skip_incomplete_marker: bool = False,
+              skip_deletion_marker: bool = False) -> tuple[list[dict], list[str]]:
     """Include private raw files and logs for LOCAL backup, without following links."""
     records = []
     folders = []
@@ -38,6 +39,8 @@ def inventory(package: Path, *, skip_incomplete_marker: bool = False) -> tuple[l
             raise ValueError("Backup exceeds directory count limit")
         for name in filenames:
             if skip_incomplete_marker and Path(current) == package and name == ".backup-incomplete.json":
+                continue
+            if skip_deletion_marker and Path(current) == package and name == ".deletion-incomplete.json":
                 continue
             path = Path(current) / name
             info = path.stat()

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import sys
 import uuid
@@ -59,7 +60,7 @@ def plan_delete(package: Path, *, confirm_local_storage: bool, workspace: Path =
     files, directories = inventory(package)
     if sha(header) != original or any(path.exists() or path.is_symlink() for path in blocked):
         raise ValueError("Package changed during deletion planning")
-    return {"plan_version": "1.0", "dry_run": True, "operation": "delete_local_package",
+    return {"plan_version": "1.1", "dry_run": True, "operation": "delete_local_package", "policy": policy,
             "package": str(package), "manifest_sha256": original, "files": files,
             "directories": directories, "total_bytes": sum(item["bytes"] for item in files),
             "not_covered": list(NOT_COVERED), "deletes_package_directory": True,
@@ -87,34 +88,106 @@ def delete_verified_file(package: Path, record: dict) -> None:
     path.unlink()
 
 
+def resume_state(package: Path, expected_digest: str, *, confirm_local_storage: bool,
+                 workspace: Path = ROOT, _lock_token: bytes | None = None) -> tuple:
+    if confirm_local_storage is not True:
+        raise ValueError("Confirm local storage before inspecting interrupted deletion")
+    if not isinstance(expected_digest, str) or not re.fullmatch(r"[0-9a-f]{64}", expected_digest):
+        raise ValueError("Provide the original approved deletion plan hash")
+    package = check_private_location(package, workspace)
+    lock = package.parent / ".deletion.lock"
+    blocked = [package / "manifest.json", package / ".migration-incomplete.json",
+               package / ".backup-incomplete.json", package.parent / ".migration.lock",
+               package.parent / ".backup.lock"]
+    if _lock_token is None:
+        blocked.append(lock)
+    elif not plain_path(lock).is_file() or lock.read_bytes() != _lock_token:
+        raise ValueError("Deletion lock ownership changed")
+    if any(path.exists() or path.is_symlink() for path in blocked):
+        raise ValueError("Conflicting local package state prevents deletion recovery")
+    marker = plain_path(package / ".deletion-incomplete.json")
+    with marker.open("rb") as handle:
+        data = handle.read(16 * 1024 * 1024 + 1)
+    if len(data) > 16 * 1024 * 1024:
+        raise ValueError("Deletion recovery metadata exceeds size limit")
+    try:
+        state = json.loads(data)
+    except (ValueError, UnicodeError):
+        raise ValueError("Invalid deletion recovery metadata") from None
+    if not isinstance(state, dict) or not isinstance(state.get("plan"), dict):
+        raise ValueError("Invalid deletion recovery metadata")
+    plan = state["plan"]
+    if state.get("plan_sha256") != expected_digest or plan_digest(plan) != expected_digest:
+        raise ValueError("Recovery plan does not match the original approved hash")
+    if (plan.get("plan_version") != "1.1" or plan.get("operation") != "delete_local_package"
+            or plan.get("package") != str(package)):
+        raise ValueError("Unsupported recovery plan or different package location")
+    effective = authorize_operation([plan.get("policy")], "delete", ExecutionTarget("local", False))
+    if effective["execution_mode"] != "local_only" or effective["distribution_mode"] != "local_only":
+        raise ValueError("Recovery requires the original local-only policy")
+    records, directories = plan.get("files"), plan.get("directories")
+    if not isinstance(records, list) or not isinstance(directories, list) or len(records) > 10000 or len(directories) > 10000:
+        raise ValueError("Invalid recovery inventory")
+    approved = {}
+    for record in records:
+        if (not isinstance(record, dict) or set(record) != {"path", "bytes", "sha256"}
+                or type(record["bytes"]) is not int or record["bytes"] < 0
+                or not isinstance(record["sha256"], str) or not re.fullmatch(r"[0-9a-f]{64}", record["sha256"])):
+            raise ValueError("Invalid recovery file record")
+        path = deletion_path(package, record["path"])
+        if path == marker or record["path"] in approved:
+            raise ValueError("Duplicate or reserved recovery file")
+        approved[record["path"]] = record
+    for relative in directories:
+        deletion_path(package, relative)
+    if len(set(directories)) != len(directories):
+        raise ValueError("Duplicate recovery directory")
+    remaining, folders = inventory(package, skip_deletion_marker=True)
+    if any(approved.get(record["path"]) != record for record in remaining) or not set(folders).issubset(directories):
+        raise ValueError("Changed or unlisted content must be reviewed locally; no files removed")
+    if plain_path(marker).read_bytes() != data:
+        raise ValueError("Recovery metadata changed during inspection")
+    return plan, remaining, folders, data
+
+
 def apply_delete(package: Path, *, confirm_local_storage: bool, confirm_delete: bool,
-                 expected_digest: str, workspace: Path = ROOT) -> dict:
+                 expected_digest: str, workspace: Path = ROOT, resume: bool = False) -> dict:
     if confirm_delete is not True:
         raise ValueError("Explicit irreversible deletion confirmation is required")
-    plan = plan_delete(package, confirm_local_storage=confirm_local_storage, workspace=workspace)
+    if resume:
+        plan, _, _, _ = resume_state(package, expected_digest, confirm_local_storage=confirm_local_storage, workspace=workspace)
+    else:
+        plan = plan_delete(package, confirm_local_storage=confirm_local_storage, workspace=workspace)
     if not isinstance(expected_digest, str) or plan_digest(plan) != expected_digest:
         raise ValueError("Deletion plan changed; inspect a new dry-run before applying")
     package = check_private_location(Path(plan["package"]), workspace)
-    policy = policy_from_manifest(read_json(package_file(package, "manifest.v2.json")))
-    authorize_operation([policy], "delete", ExecutionTarget("local", False))
+    authorize_operation([plan["policy"]], "delete", ExecutionTarget("local", False))
     lock = package.parent / ".deletion.lock"
     token = json.dumps({"pid": os.getpid(), "token": uuid.uuid4().hex}).encode()
     write_new(lock, token)
     try:
-        fresh = plan_delete(package, confirm_local_storage=True, workspace=workspace, _lock_token=token)
+        if resume:
+            fresh, remaining, folders, marker_data = resume_state(package, expected_digest, confirm_local_storage=True,
+                                                                  workspace=workspace, _lock_token=token)
+        else:
+            fresh = plan_delete(package, confirm_local_storage=True, workspace=workspace, _lock_token=token)
+            remaining, folders = plan["files"], plan["directories"]
+            marker_data = json.dumps({"plan_sha256": expected_digest, "plan": plan}, ensure_ascii=False).encode("utf-8")
         if plan_digest(fresh) != expected_digest:
             raise ValueError("Package changed before deletion; no files removed")
         marker = package / ".deletion-incomplete.json"
-        marker_data = json.dumps({"plan_sha256": expected_digest, "plan": plan}, ensure_ascii=False).encode("utf-8")
-        write_new(marker, marker_data)
+        if len(marker_data) > 16 * 1024 * 1024:
+            raise ValueError("Deletion plan is too large for recoverable metadata; no files removed")
+        if not resume:
+            write_new(marker, marker_data)
         # Keep manifest until last, although every runtime rejects the marker.
-        records = sorted(plan["files"], key=lambda item: (item["path"] == "manifest.v2.json", item["path"]))
+        records = sorted(remaining, key=lambda item: (item["path"] == "manifest.v2.json", item["path"]))
         for record in records:
             check_private_location(package, workspace)
             if plain_path(lock).read_bytes() != token or plain_path(marker).read_bytes() != marker_data:
                 raise ValueError("Deletion state changed; stop and inspect locally")
             delete_verified_file(package, record)
-        for relative in sorted(plan["directories"], key=lambda value: (-len(PurePosixPath(value).parts), value)):
+        for relative in sorted(folders, key=lambda value: (-len(PurePosixPath(value).parts), value)):
             deletion_path(package, relative).rmdir()  # Fails on new/unlisted files.
         check_private_location(package, workspace)
         if set(package.iterdir()) != {marker} or plain_path(marker).read_bytes() != marker_data:
@@ -134,6 +207,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--confirm-local-storage", action="store_true")
     parser.add_argument("--show-plan", action="store_true", help="Show private path inventory on a local terminal only")
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--resume", action="store_true", help="Inspect or continue an interrupted deletion using its original hash")
     parser.add_argument("--expect-plan-sha256")
     parser.add_argument("--confirm-delete", action="store_true", help="Confirm irreversible deletion of exactly this package")
     args = parser.parse_args(argv)
@@ -145,13 +219,19 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.apply:
             result = apply_delete(args.package, confirm_local_storage=args.confirm_local_storage,
-                                  confirm_delete=args.confirm_delete, expected_digest=args.expect_plan_sha256)
+                                  confirm_delete=args.confirm_delete, expected_digest=args.expect_plan_sha256,
+                                  resume=args.resume)
             print(json.dumps(result, ensure_ascii=False, indent=2))
             return 0
-        plan = plan_delete(args.package, confirm_local_storage=args.confirm_local_storage)
+        if args.resume:
+            plan, remaining, folders, _ = resume_state(args.package, args.expect_plan_sha256,
+                                                      confirm_local_storage=args.confirm_local_storage)
+        else:
+            plan = plan_delete(args.package, confirm_local_storage=args.confirm_local_storage)
+            remaining, folders = plan["files"], plan["directories"]
         result = {"ok": True, "dry_run": True, "plan_sha256": plan_digest(plan),
-                  "file_count": len(plan["files"]), "directory_count": len(plan["directories"]),
-                  "total_bytes": plan["total_bytes"], "not_covered": plan["not_covered"]}
+                  "file_count": len(remaining), "directory_count": len(folders),
+                  "total_bytes": sum(item["bytes"] for item in remaining), "not_covered": plan["not_covered"]}
         if args.show_plan:
             result["plan"] = plan
         print(json.dumps(result, ensure_ascii=False, indent=2))
