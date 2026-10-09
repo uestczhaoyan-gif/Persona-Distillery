@@ -72,6 +72,9 @@ class PersonaMemoryTests(unittest.TestCase):
                 self.assertNotIn("直接对话/prompts/agent.md", candidate["compiled_files"])
                 self.assertNotIn(f"直接对话/personas/{person}.md", candidate["compiled_files"])
                 self.assertIn(f"直接对话/prompts/candidates/m2-v1/{person}.md", candidate["compiled_files"])
+                rhythms = [p for p in candidate["compiled_files"] if p.endswith("-rhythm.md")]
+                self.assertEqual(rhythms, [f"直接对话/prompts/candidates/m2-v1/{person}-rhythm.md"])
+                self.assertFalse(any(p.endswith("-rhythm.md") for p in current["compiled_files"]))
                 for file, digest in current["input_sha256"].items():
                     if file.startswith(f"personas/{person}/") and not file.endswith("03-persona-spec.md"):
                         self.assertEqual(candidate["input_sha256"][file], digest)

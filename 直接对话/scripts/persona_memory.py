@@ -152,12 +152,15 @@ def compile_context(name: str, root: Path = ROOT, preview: bool = False,
         module = root / "直接对话"
         common = checked_file(module, "prompts/candidates/m2-v1/common.md")
         core = checked_file(module, f"prompts/candidates/m2-v1/{plan['person_id']}.md")
+        rhythm = checked_file(module, f"prompts/candidates/m2-v1/{plan['person_id']}-rhythm.md")
         replacements = {
             "直接对话/prompts/agent.md": common.relative_to(root).as_posix(),
             f"personas/{plan['person_id']}/{manifest['files']['persona_spec']}": core.relative_to(root).as_posix(),
         }
         adapter = f"直接对话/personas/{plan['person_id']}.md"
         load_files = [replacements.get(path, path) for path in load_files if path != adapter]
+        load_files.insert(load_files.index(core.relative_to(root).as_posix()) + 1,
+                          rhythm.relative_to(root).as_posix())
     memory_paths = {f"personas/{plan['person_id']}/{manifest['files'][role]}"
                     for role in ("evidence", "context_memory") if role in manifest["files"]}
     _, searchable = load_memory(name, root, preview)
