@@ -22,6 +22,8 @@ def main(argv: list[str] | None = None) -> int:
         child.add_argument("--preview", action="store_true", help="Use existing authorized historical-public preview")
         if command in {"context", "chat"}:
             child.add_argument("--max-chars", type=int, default=100000)
+            child.add_argument("--prompt-profile", choices=("current", "m2-v1"), default="current",
+                               help="Opt-in unvalidated dialogue candidate; default stays current")
         if command == "chat":
             child.add_argument("--provider", choices=("ollama",), required=True)
             child.add_argument("--model", required=True, help="Installed local model")
@@ -44,7 +46,10 @@ def main(argv: list[str] | None = None) -> int:
             resolve_persona(args.name, args.root, args.preview)
             provider = OllamaProvider(args.model, args.base_url, args.timeout, args.num_ctx, args.max_output_tokens)
             provider.prepare()
-            session = ChatSession(args.name, provider, args.root, args.preview, args.max_chars)
+            session = ChatSession(args.name, provider, args.root, args.preview, args.max_chars,
+                                  prompt_profile=args.prompt_profile)
+            if args.prompt_profile != "current":
+                print("精简候选 m2-v1 · 尚未通过真实质量评测", file=sys.stderr)
             if args.resume:
                 session.resume_summary(args.resume)
             print(f"人物视角模拟 · {session.compiled['display_name']} · {provider.model} · 数据发送至 {provider.base_url} · 默认不保存对话", file=sys.stderr)
@@ -58,7 +63,8 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "doctor":
             result = doctor_persona(args.name, args.root, args.preview)
         elif args.command == "context":
-            result = compile_context(args.name, args.root, args.preview, args.max_chars)
+            result = compile_context(args.name, args.root, args.preview, args.max_chars,
+                                     prompt_profile=args.prompt_profile)
         else:
             result = search_memory(args.name, args.query, args.root, args.preview, args.top_k, args.kind)
         print(json.dumps(result, ensure_ascii=False, indent=2))

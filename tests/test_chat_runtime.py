@@ -103,6 +103,27 @@ class ChatRuntimeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "identity/version"):
             session.resume_summary(identifier)
 
+    def test_candidate_request_and_summary_do_not_mix_with_default(self):
+        with tempfile.TemporaryDirectory() as directory:
+            provider = StubProvider([answer()])
+            candidate = ChatSession("kongzi", provider, preview=True, prompt_profile="m2-v1")
+            candidate.root = Path(directory)
+            candidate.send("你好")
+            self.assertEqual(provider.requests[0][0]["content"], candidate.compiled["context"])
+            identifier = candidate.save_summary("原创测试摘要")
+            candidate.resume_summary(identifier)
+            current = ChatSession("kongzi", StubProvider([]), preview=True)
+            current.root = Path(directory)
+            with self.assertRaisesRegex(ValueError, "identity/version"):
+                current.resume_summary(identifier)
+            path = candidate.sessions_dir() / identifier / "summary.json"
+            data = json.loads(path.read_text(encoding="utf-8"))
+            data.pop("prompt_profile")
+            path.write_text(json.dumps(data), encoding="utf-8")
+            current.resume_summary(identifier)  # Old summaries belong to current only.
+            with self.assertRaisesRegex(ValueError, "identity/version"):
+                candidate.resume_summary(identifier)
+
     def test_interactive_research_new_and_exit(self):
         session = ChatSession("kongzi", StubProvider([answer()]), preview=True)
         lines = iter(["/research on", "问题", "/sources", "/new", "/exit"])

@@ -20,8 +20,9 @@ TOOLS = [{"type": "function", "function": {
 
 class ChatSession:
     def __init__(self, name: str, provider, root: Path = ROOT, preview: bool = False,
-                 max_chars: int = 100000, max_history_chars: int = 200000):
-        self.compiled = compile_context(name, root, preview, max_chars)
+                 max_chars: int = 100000, max_history_chars: int = 200000,
+                 *, prompt_profile: str = "current"):
+        self.compiled = compile_context(name, root, preview, max_chars, prompt_profile=prompt_profile)
         if self.compiled["requires_search_tool"] and not provider.supports_tools:
             raise ValueError("Incomplete memory requires a model with search_memory tool support; raise max_chars or choose a tool-capable model")
         self.root, self.preview, self.provider = root.resolve(), preview, provider
@@ -108,6 +109,7 @@ class ChatSession:
         directory.mkdir(parents=True)
         data = {"schema_version": "1.0", "session_id": session_id, "person_id": self.person_id,
                 "package_version": self.compiled["package_version"], "summary": summary,
+                "prompt_profile": self.compiled["prompt_profile"],
                 "saved_at": datetime.now(timezone.utc).isoformat(), "full_transcript_saved": False}
         (directory / "summary.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         return session_id
@@ -122,6 +124,7 @@ class ChatSession:
         data = json.loads(path.read_text(encoding="utf-8"))
         if (data.get("schema_version") != "1.0" or data.get("session_id") != session_id
                 or data.get("person_id") != self.person_id or data.get("package_version") != self.compiled["package_version"]
+                or data.get("prompt_profile", "current") != self.compiled["prompt_profile"]
                 or not isinstance(data.get("summary"), str) or not 1 <= len(data["summary"]) <= 10000):
             raise ValueError("Summary identity/version mismatch or invalid content; start a new session")
         self.reset()
