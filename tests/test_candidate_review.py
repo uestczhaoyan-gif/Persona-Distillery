@@ -208,10 +208,45 @@ class CandidateRunReadTests(unittest.TestCase):
         path.write_bytes(b"{}")
         with self.assertRaises(ValueError):
             review.read_review(self.library, self.job["job"]["id"], saved["review_sha256"], confirm_local_storage=True)
+
         path.write_bytes(original)
         (self.incoming / "source.txt").unlink()
         with self.assertRaises(ValueError):
             review.read_review(self.library, self.job["job"]["id"], saved["review_sha256"], confirm_local_storage=True)
+
+    def test_nonempty_generation_edit_and_revision_preserve_all_previous_content(self):
+        self.ready()
+        provider = self.provider()
+        def synthesize(messages, tools):
+            source = json.loads(messages[1]["content"])["chunks"][0]
+            self.generated = {"card_type": "synthesis", "claim": "Synthetic initial claim",
+                              "evidence_summary": "Original fixture only", "interpretation": "Tentative fixture",
+                              "limitations": "No actual person or real review", "chunk_ids": [source["chunk_id"]],
+                              "topics": [], "confidence": "low"}
+            return {"content": json.dumps({"evidence": [self.generated], "memories": [], "gaps": []})}
+        provider.complete.side_effect = synthesize
+        self.result = self.run_generation()
+        current = self.read()
+        candidate_path = self.library / self.job["job"]["id"] / "candidates" / self.result["run_sha256"] / "candidates.json"
+        candidate_before = candidate_path.read_bytes()
+        replacement = copy.deepcopy(self.generated)
+        replacement["claim"] = "Synthetic human revision one"
+        decision = {"candidates_sha256": current["candidates_sha256"], "reviewer": "Fixture author", "note": "Synthetic only",
+                    "decisions": [{"record_id": "E-0001", "action": "edit", "reason": "Fixture clarification",
+                                   "replacement": replacement}]}
+        first = review.save_review(self.library, self.job["job"]["id"], self.result["run_sha256"], decision, confirm_local_storage=True)
+        first_path = self.library / self.job["job"]["id"] / "reviews" / first["review_sha256"] / "review.json"
+        first_before = first_path.read_bytes()
+        replacement["claim"] = "Synthetic human revision two"
+        second = review.save_review(self.library, self.job["job"]["id"], self.result["run_sha256"], decision, confirm_local_storage=True)
+        self.assertNotEqual(first["review_sha256"], second["review_sha256"])
+        self.assertEqual(first_path.read_bytes(), first_before)
+        self.assertEqual(candidate_path.read_bytes(), candidate_before)
+        first_value = review.read_review(self.library, self.job["job"]["id"], first["review_sha256"], confirm_local_storage=True)
+        second_value = review.read_review(self.library, self.job["job"]["id"], second["review_sha256"], confirm_local_storage=True)
+        self.assertEqual(first_value["result"]["accepted"][0]["record"]["claim"], "Synthetic human revision one")
+        self.assertEqual(second_value["result"]["accepted"][0]["record"]["claim"], "Synthetic human revision two")
+        self.assertEqual(provider.complete.call_count, 1)
 
 
 if __name__ == "__main__":
