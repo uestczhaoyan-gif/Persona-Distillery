@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 
@@ -85,9 +86,13 @@ def prepare(root: Path = ROOT, *, preview: bool = False) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--preview", action="store_true", help="Existing historical preview authorization")
+    parser.add_argument("--freeze", action="store_true", help="Save immutable inputs under ignored .work/pilots; no model calls")
     args = parser.parse_args()
     try:
         result = prepare(preview=args.preview)
+        if args.freeze:
+            print(json.dumps(freeze_inputs(result), ensure_ascii=True))
+            return 0
         # Default CLI emits only manifest metadata, not memory bodies or answers.
         for item in result["inputs"]:
             item.pop("messages")
@@ -96,6 +101,36 @@ def main() -> int:
     except (OSError, ValueError, KeyError, subprocess.SubprocessError):
         print('{"ok": false, "error": "Pilot input preparation failed; check authorization, Git history and unchanged eligible materials"}')
         return 1
+
+
+def freeze_inputs(plan: dict, root: Path = ROOT) -> dict:
+    """Internal writer for prepared public pilot inputs; never overwrite a snapshot."""
+    if plan.get("status") != "MODEL_PENDING" or plan.get("real_model_calls") != 0:
+        raise ValueError("Only pending offline inputs may be frozen")
+    raw = json.dumps(plan, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+                     allow_nan=False).encode("utf-8")
+    identity = hashlib.sha256(raw).hexdigest()
+    root = root.resolve()
+    directory = root
+    for name in (".work", "pilots"):
+        directory = directory / name
+        if directory.is_symlink() or (directory.exists() and
+                getattr(directory.lstat(), "st_file_attributes", 0) & 0x400):
+            raise ValueError("Snapshot location cannot be a link")
+        directory.mkdir(exist_ok=True)
+    path = directory / (identity + ".json")
+    if path.is_symlink() or (path.exists() and getattr(path.lstat(), "st_file_attributes", 0) & 0x400):
+        raise ValueError("Snapshot cannot be a link")
+    try:
+        with path.open("xb") as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+    except FileExistsError:
+        if path.stat().st_size != len(raw) or path.read_bytes() != raw:
+            raise ValueError("Existing snapshot differs; preserve it and investigate") from None
+    return {"status": "MODEL_PENDING", "snapshot_sha256": identity,
+            "relative_path": path.relative_to(root).as_posix(), "real_model_calls": 0}
 
 
 if __name__ == "__main__":

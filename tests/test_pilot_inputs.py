@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -10,6 +11,25 @@ import pilot_inputs as pilot
 
 
 class PilotInputsTests(unittest.TestCase):
+    def test_freeze_is_content_addressed_and_never_overwrites_damage(self):
+        plan = {"status": "MODEL_PENDING", "real_model_calls": 0, "questions": ["original fixture"]}
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            result = pilot.freeze_inputs(plan, root)
+            self.assertEqual(result, pilot.freeze_inputs(plan, root))
+            path = root / result["relative_path"]
+            self.assertEqual(pilot.digest(path.read_text(encoding="utf-8")), result["snapshot_sha256"])
+            changed = {**plan, "questions": ["another fixture"]}
+            self.assertNotEqual(result["snapshot_sha256"], pilot.freeze_inputs(changed, root)["snapshot_sha256"])
+            path.write_text("incomplete", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "Existing snapshot differs"):
+                pilot.freeze_inputs(plan, root)
+            self.assertEqual(path.read_text(encoding="utf-8"), "incomplete")
+
+    def test_freeze_rejects_nonpending_state(self):
+        with self.assertRaises(ValueError):
+            pilot.freeze_inputs({"status": "COMPLETE", "real_model_calls": 1})
+
     def test_four_groups_are_reproducible_and_have_no_results(self):
         first = pilot.prepare(preview=True)
         self.assertEqual(first, pilot.prepare(preview=True))
