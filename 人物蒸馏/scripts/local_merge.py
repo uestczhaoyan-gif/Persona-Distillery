@@ -180,24 +180,30 @@ def save_merge(library: Path, job_id: str, review_ids: list[str], *, previous_me
                 "counts": catalog["counts"], "publication_approved": False, "persona_generated": False}
 
 
-def read_merge(library: Path, job_id: str, merge_id: str, *, confirm_local_storage: bool = False) -> dict:
+def _read_merge_locked(library: Path, job_id: str, merge_id: str, *, confirm_local_storage: bool = False) -> dict:
     """Local consumers must use this current-source check instead of read_snapshot."""
     job, _, _ = local.load_job(library, job_id, confirm_local_storage=confirm_local_storage)
     directory = local.job_directory(library, job_id)
+    material = current_material(library, job_id)
+    state, binding, policy, chunks = material
+    envelope = read_snapshot(directory, merge_id)
+    if (envelope["config_sha256"] != state["config_sha256"]
+            or envelope["snapshot_sha256"] != binding["snapshot_sha256"]
+            or (envelope["schema_version"] in {"1.1", "1.2"} and envelope["input_fingerprint"] != binding["input_fingerprint"])):
+        raise ValueError("Merge does not reflect current material")
+    ids = envelope["review_ids"]
+    if not isinstance(ids, list) or not 1 <= len(ids) <= 100 or any(not isinstance(x, str) for x in ids) or len(set(ids)) != len(ids):
+        raise ValueError("Invalid merge review list")
+    history = [historical_source(directory, exact_hash(rid), job, state) for rid in ids]
+    if merge_history(history, chunks, policy, resolutions=envelope.get("resolutions")) != envelope["catalog"]:
+        raise ValueError("Merge catalog does not rebuild from reviewed sources")
+    if current_material(library, job_id) != material:
+        raise ValueError("Source changed during merge read")
+    return envelope
+
+
+def read_merge(library: Path, job_id: str, merge_id: str, *, confirm_local_storage: bool = False) -> dict:
+    local.load_job(library, job_id, confirm_local_storage=confirm_local_storage)
+    directory = local.job_directory(library, job_id)
     with local.job_lock(directory):
-        material = current_material(library, job_id)
-        state, binding, policy, chunks = material
-        envelope = read_snapshot(directory, merge_id)
-        if (envelope["config_sha256"] != state["config_sha256"]
-                or envelope["snapshot_sha256"] != binding["snapshot_sha256"]
-                or (envelope["schema_version"] in {"1.1", "1.2"} and envelope["input_fingerprint"] != binding["input_fingerprint"])):
-            raise ValueError("Merge does not reflect current material")
-        ids = envelope["review_ids"]
-        if not isinstance(ids, list) or not 1 <= len(ids) <= 100 or any(not isinstance(x, str) for x in ids) or len(set(ids)) != len(ids):
-            raise ValueError("Invalid merge review list")
-        history = [historical_source(directory, exact_hash(rid), job, state) for rid in ids]
-        if merge_history(history, chunks, policy, resolutions=envelope.get("resolutions")) != envelope["catalog"]:
-            raise ValueError("Merge catalog does not rebuild from reviewed sources")
-        if current_material(library, job_id) != material:
-            raise ValueError("Source changed during merge read")
-        return envelope
+        return _read_merge_locked(library, job_id, merge_id, confirm_local_storage=True)
