@@ -108,9 +108,29 @@ def read_snapshot(directory, merge_id):
     index, _ = bounded_json(output / "checksums.json")
     if index != {"merge.json": checksum} or fingerprint(value) != merge_id:
         raise ValueError("Merge snapshot changed")
-    if set(value) != {"schema_version", "config_sha256", "review_ids", "previous_merge", "snapshot_sha256", "catalog"}:
+    expected = {"schema_version", "config_sha256", "review_ids", "previous_merge", "snapshot_sha256", "catalog"}
+    if value.get("schema_version") == "1.1":
+        expected.add("input_fingerprint")
+    elif value.get("schema_version") != "1.0":
+        raise ValueError("Unknown merge snapshot version")
+    if set(value) != expected:
         raise ValueError("Invalid merge envelope")
     return value
+
+
+def current_material(library, job_id):
+    job, paths, state = local.load_job(library, job_id, confirm_local_storage=True)
+    if state["status"] != "needs_inputs":
+        state, snapshot, policy = checked_snapshot(library, job_id)
+        return state, {"snapshot_sha256": state["snapshot_sha256"], "input_fingerprint": state["input_fingerprint"]}, policy, chunks_from(snapshot)
+    # Empty means confirmed absence of all source files, not failed parsing or quarantined files.
+    fingerprint_now, entries = local.input_inventory(paths)
+    if entries:
+        raise ValueError("Unusable inputs are not a complete source withdrawal")
+    for gate, expected in (("identity", state["config_sha256"]), ("material", fingerprint_now)):
+        if state["approvals"].get(gate, {}).get("fingerprint") != expected:
+            raise ValueError("Empty source state requires current identity and material review")
+    return state, {"snapshot_sha256": None, "input_fingerprint": fingerprint_now}, job["policy"], []
 
 
 def save_merge(library: Path, job_id: str, review_ids: list[str], *, previous_merge: str | None = None,
@@ -121,18 +141,19 @@ def save_merge(library: Path, job_id: str, review_ids: list[str], *, previous_me
         raise ValueError("Expected unique ordered review hashes")
     directory = local.job_directory(library, job_id)
     with local.job_lock(directory):
-        state, snapshot, policy = checked_snapshot(library, job_id)
+        material = current_material(library, job_id)
+        state, binding, policy, chunks = material
         history = [historical_source(directory, exact_hash(rid), job, state) for rid in review_ids]
         previous = None
         if previous_merge is not None:
             previous = read_snapshot(directory, previous_merge)
-            if (previous["schema_version"] != "1.0" or previous["config_sha256"] != state["config_sha256"]
+            if (previous["config_sha256"] != state["config_sha256"]
                     or review_ids[:len(previous["review_ids"])] != previous["review_ids"]):
                 raise ValueError("Prior merge belongs to another job or history changed")
-        catalog = merge_history(history, chunks_from(snapshot), policy,
+        catalog = merge_history(history, chunks, policy,
                                 previous_history=previous["catalog"]["history_sha256"] if previous else None)
-        envelope = {"schema_version": "1.0", "config_sha256": state["config_sha256"], "review_ids": review_ids,
-                    "previous_merge": previous_merge, "snapshot_sha256": state["snapshot_sha256"], "catalog": catalog}
+        envelope = {"schema_version": "1.1", "config_sha256": state["config_sha256"], "review_ids": review_ids,
+                    "previous_merge": previous_merge, **binding, "catalog": catalog}
         merge_id = fingerprint(envelope)
         output = local.plain_path(directory / "merges" / merge_id)
         if output.exists():
@@ -146,9 +167,33 @@ def save_merge(library: Path, job_id: str, review_ids: list[str], *, previous_me
                 raise ValueError("Merge exceeds size limit")
             local.write_new(output / "merge.json", raw)
             local.write_new(output / "checksums.json", (local.canonical({"merge.json": local.digest(raw)}) + "\n").encode())
-            checked_snapshot(library, job_id, state)
+            if current_material(library, job_id) != material:
+                raise ValueError("Current material changed during merge")
             if [historical_source(directory, rid, job, state) for rid in review_ids] != history:
                 raise ValueError("History changed during merge")
             local.plain_path(output / ".incomplete").unlink()
         return {"ok": True, "status": "merge_review_pending", "merge_sha256": merge_id,
                 "counts": catalog["counts"], "publication_approved": False, "persona_generated": False}
+
+
+def read_merge(library: Path, job_id: str, merge_id: str, *, confirm_local_storage: bool = False) -> dict:
+    """Local consumers must use this current-source check instead of read_snapshot."""
+    job, _, _ = local.load_job(library, job_id, confirm_local_storage=confirm_local_storage)
+    directory = local.job_directory(library, job_id)
+    with local.job_lock(directory):
+        material = current_material(library, job_id)
+        state, binding, policy, chunks = material
+        envelope = read_snapshot(directory, merge_id)
+        if (envelope["config_sha256"] != state["config_sha256"]
+                or envelope["snapshot_sha256"] != binding["snapshot_sha256"]
+                or (envelope["schema_version"] == "1.1" and envelope["input_fingerprint"] != binding["input_fingerprint"])):
+            raise ValueError("Merge does not reflect current material")
+        ids = envelope["review_ids"]
+        if not isinstance(ids, list) or not 1 <= len(ids) <= 100 or any(not isinstance(x, str) for x in ids) or len(set(ids)) != len(ids):
+            raise ValueError("Invalid merge review list")
+        history = [historical_source(directory, exact_hash(rid), job, state) for rid in ids]
+        if merge_history(history, chunks, policy) != envelope["catalog"]:
+            raise ValueError("Merge catalog does not rebuild from reviewed sources")
+        if current_material(library, job_id) != material:
+            raise ValueError("Source changed during merge read")
+        return envelope

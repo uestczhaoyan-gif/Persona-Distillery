@@ -124,6 +124,75 @@ class LocalMergeTests(unittest.TestCase):
         output = next((self.library / self.job["job"]["id"] / "merges").iterdir())
         self.assertTrue((output / ".incomplete").exists())
 
+    def read_current(self, result):
+        return merge.read_merge(self.library, self.job["job"]["id"], result["merge_sha256"], confirm_local_storage=True)
+
+    def test_current_reader_rebuilds_and_rejects_stale_material(self):
+        review_id = self.prepare()
+        result = self.merge([review_id])
+        self.assertEqual(self.read_current(result)["catalog"]["counts"]["active"], 1)
+        (self.incoming / "source.txt").write_text("Changed original fixture", encoding="utf-8")
+        with self.assertRaises(ValueError):
+            self.read_current(result)
+        self.approve("material")
+        self.build(update=True)
+        with self.assertRaisesRegex(ValueError, "current material"):
+            self.read_current(result)
+
+    def test_all_source_withdrawal_requires_review_then_disables_every_record(self):
+        review_id = self.prepare()
+        first = self.merge([review_id])
+        (self.incoming / "source.txt").unlink()
+        with self.assertRaises(ValueError):
+            self.merge([review_id], first["merge_sha256"])
+        self.approve("material")
+        self.assertEqual(self.build(update=True)["status"], "needs_inputs")
+        result = self.merge([review_id], first["merge_sha256"])
+        value = self.read_current(result)
+        self.assertIsNone(value["snapshot_sha256"])
+        self.assertEqual(value["catalog"]["counts"]["withdrawn"], 1)
+        self.assertIsNone(value["catalog"]["entries"][0]["active_record"])
+        with self.assertRaises(ValueError):
+            self.read_current(first)
+
+    def test_quarantined_inputs_are_not_treated_as_all_withdrawn(self):
+        review_id = self.prepare()
+        (self.incoming / "source.txt").unlink()
+        (self.incoming / "unsupported.pdf").write_bytes(b"Synthetic unsupported input")
+        self.approve("material")
+        self.assertEqual(self.build(update=True)["status"], "needs_inputs")
+        with self.assertRaisesRegex(ValueError, "not a complete source withdrawal"):
+            self.merge([review_id])
+
+    def test_reader_rejects_rehashed_catalog_forgery(self):
+        review_id = self.prepare()
+        result = self.merge([review_id])
+        directory = self.library / self.job["job"]["id"]
+        value = self.read_current(result)
+        value["catalog"]["entries"][0]["active_record"]["claim"] = "Forged synthetic claim"
+        forged_id = merge.fingerprint(value)
+        output = directory / "merges" / forged_id
+        output.mkdir()
+        raw = (merge.local.canonical(value) + "\n").encode()
+        (output / "merge.json").write_bytes(raw)
+        (output / "checksums.json").write_text(json.dumps({"merge.json": merge.local.digest(raw)}), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "does not rebuild"):
+            self.read_current({"merge_sha256": forged_id})
+
+    def test_legacy_merge_envelope_can_be_verified_without_silent_upgrade(self):
+        review_id = self.prepare()
+        result = self.merge([review_id])
+        value = self.read_current(result)
+        value["schema_version"] = "1.0"
+        value.pop("input_fingerprint")
+        old_id = merge.fingerprint(value)
+        output = self.library / self.job["job"]["id"] / "merges" / old_id
+        output.mkdir()
+        raw = (merge.local.canonical(value) + "\n").encode()
+        (output / "merge.json").write_bytes(raw)
+        (output / "checksums.json").write_text(json.dumps({"merge.json": merge.local.digest(raw)}), encoding="utf-8")
+        self.assertEqual(self.read_current({"merge_sha256": old_id}), value)
+
 
 if __name__ == "__main__":
     unittest.main()
