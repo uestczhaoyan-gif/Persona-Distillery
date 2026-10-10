@@ -112,3 +112,28 @@ def normalize_candidates(payload: dict, chunks: list[dict], policy: dict) -> dic
             "input_chunks_sha256": fingerprint(chunks), "evidence": evidence, "context_memory": memories,
             "lineage": lineage, "gaps": [text(gap, limit=1000) for gap in payload["gaps"]],
             "semantic_review_completed": False, "persona_generated": False}
+
+
+def verify_candidates(bundle: dict, chunks: list[dict], policy: dict) -> dict:
+    """Rebuild all derived fields; file hashes alone do not validate a candidate contract."""
+    authorize_operation([policy], "read", ExecutionTarget("local", False))
+    try:
+        if not isinstance(bundle, dict) or not isinstance(bundle["lineage"], list):
+            raise ValueError("Invalid candidate bundle")
+        lookup = {entry["record_id"]: entry for entry in bundle["lineage"]}
+        if len(lookup) != len(bundle["lineage"]):
+            raise ValueError("Duplicate lineage")
+        payload = {"evidence": [], "memories": [], "gaps": bundle["gaps"]}
+        for field, target, fields, id_key in (
+                ("evidence", "evidence", EVIDENCE_TEXT + ("card_type",), "evidence_id"),
+                ("context_memory", "memories", MEMORY_TEXT, "memory_id")):
+            for record in bundle[field]:
+                raw = {key: record[key] for key in fields + ("topics", "confidence")}
+                raw["chunk_ids"] = [ref["chunk_id"] for ref in lookup[record[id_key]]["chunk_refs"]]
+                payload[target].append(raw)
+        rebuilt = normalize_candidates(payload, chunks, policy)
+        if rebuilt != bundle:
+            raise ValueError("Candidate content or lineage changed")
+        return payload
+    except (KeyError, TypeError, AttributeError) as exc:
+        raise ValueError("Invalid candidate bundle") from None
