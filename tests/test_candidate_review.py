@@ -166,6 +166,53 @@ class CandidateRunReadTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     review.read_run(self.library, "fixture", run, confirm_local_storage=confirmed)
 
+    def save_decision(self):
+        current = self.read()
+        self.decision = {"candidates_sha256": current["candidates_sha256"],
+                         "reviewer": "Fixture reviewer", "note": "No real review", "decisions": []}
+        return review.save_review(self.library, self.job["job"]["id"], self.result["run_sha256"],
+                                  self.decision, confirm_local_storage=True)
+
+    def test_saved_review_is_verified_and_repeat_does_not_overwrite(self):
+        self.prepare_run()
+        saved = self.save_decision()
+        path = self.library / self.job["job"]["id"] / "reviews" / saved["review_sha256"] / "review.json"
+        before = (path.read_bytes(), path.stat().st_mtime_ns)
+        self.assertEqual(self.save_decision(), saved)
+        self.assertEqual((path.read_bytes(), path.stat().st_mtime_ns), before)
+        value = review.read_review(self.library, self.job["job"]["id"], saved["review_sha256"], confirm_local_storage=True)
+        self.assertEqual(value["decision"], self.decision)
+        self.assertFalse(value["result"]["publication_approved"])
+
+    def test_interrupted_review_preserved_and_not_reused(self):
+        self.prepare_run()
+        original = review.local.write_new
+        def interrupted(path, raw):
+            if path.name == "checksums.json":
+                raise OSError("Synthetic storage failure")
+            return original(path, raw)
+        with patch.object(review.local, "write_new", side_effect=interrupted):
+            with self.assertRaises(OSError):
+                self.save_decision()
+        output = next((self.library / self.job["job"]["id"] / "reviews").iterdir())
+        self.assertTrue((output / ".incomplete").exists())
+        with self.assertRaises(ValueError):
+            self.save_decision()
+        self.assertTrue((output / ".incomplete").exists())
+
+    def test_review_corruption_and_withdrawal_rejected(self):
+        self.prepare_run()
+        saved = self.save_decision()
+        path = self.library / self.job["job"]["id"] / "reviews" / saved["review_sha256"] / "review.json"
+        original = path.read_bytes()
+        path.write_bytes(b"{}")
+        with self.assertRaises(ValueError):
+            review.read_review(self.library, self.job["job"]["id"], saved["review_sha256"], confirm_local_storage=True)
+        path.write_bytes(original)
+        (self.incoming / "source.txt").unlink()
+        with self.assertRaises(ValueError):
+            review.read_review(self.library, self.job["job"]["id"], saved["review_sha256"], confirm_local_storage=True)
+
 
 if __name__ == "__main__":
     unittest.main()
