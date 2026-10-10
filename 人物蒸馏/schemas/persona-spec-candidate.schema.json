@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/persona-distill/schemas/persona-spec-candidate.schema.json",
+  "title": "Untrusted persona specification candidate response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile", "attention", "judgment", "dialogue_style", "knowledge_limits", "language", "anchors", "examples", "gaps"],
+  "properties": {
+    "profile": {"$ref": "#/$defs/claim"},
+    "attention": {"$ref": "#/$defs/claims"},
+    "judgment": {"$ref": "#/$defs/claims"},
+    "dialogue_style": {"$ref": "#/$defs/claims"},
+    "knowledge_limits": {"$ref": "#/$defs/claims"},
+    "language": {
+      "type": "object", "additionalProperties": false,
+      "required": ["mode", "adjustment", "record_ids"],
+      "properties": {
+        "mode": {"enum": ["contemporary-native", "historical-native", "historical-translation", "modern-translation", "undetermined"]},
+        "adjustment": {"$ref": "#/$defs/text"}, "record_ids": {"$ref": "#/$defs/refs"}
+      }
+    },
+    "anchors": {
+      "type": "array", "maxItems": 7,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["name", "trigger", "move", "misuse", "record_ids"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1, "maxLength": 120},
+          "trigger": {"$ref": "#/$defs/text"}, "move": {"$ref": "#/$defs/text"},
+          "misuse": {"$ref": "#/$defs/text"}, "record_ids": {"$ref": "#/$defs/refs"}
+        }
+      }
+    },
+    "examples": {
+      "type": "array", "maxItems": 4,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["user", "assistant", "record_ids"],
+        "properties": {
+          "user": {"$ref": "#/$defs/text"}, "assistant": {"$ref": "#/$defs/text"}, "record_ids": {"$ref": "#/$defs/refs"}
+        }
+      }
+    },
+    "gaps": {"type": "array", "maxItems": 20, "items": {"$ref": "#/$defs/text"}}
+  },
+  "$defs": {
+    "text": {"type": "string", "minLength": 1, "maxLength": 1200},
+    "refs": {"type": "array", "minItems": 1, "maxItems": 12, "uniqueItems": true, "items": {"type": "string", "pattern": "^[EM]-[0-9]{4}$"}},
+    "claim": {
+      "type": "object", "additionalProperties": false, "required": ["description", "limitations", "record_ids"],
+      "properties": {"description": {"$ref": "#/$defs/text"}, "limitations": {"$ref": "#/$defs/text"}, "record_ids": {"$ref": "#/$defs/refs"}}
+    },
+    "claims": {"type": "array", "maxItems": 6, "items": {"$ref": "#/$defs/claim"}}
+  }
+}
