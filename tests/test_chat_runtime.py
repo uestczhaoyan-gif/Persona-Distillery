@@ -176,6 +176,53 @@ class OllamaTransportTests(unittest.TestCase):
             with self.assertRaisesRegex(ProviderError, "invalid JSON"):
                 provider.complete([], [])
 
+    def test_sampling_is_explicit_validated_and_sent(self):
+        for kwargs in ({"temperature": float("nan")}, {"temperature": float("inf")},
+                       {"temperature": True}, {"temperature": -1}, {"temperature": 3},
+                       {"seed": True}, {"seed": 1.5}, {"seed": -1}, {"seed": 2147483648}):
+            with self.assertRaises(ProviderError):
+                OllamaProvider("local-model", **kwargs)
+        self.assertNotIn("temperature", OllamaProvider("local-model").options())
+        self.assertNotIn("seed", OllamaProvider("local-model").options())
+        provider = OllamaProvider("local-model", temperature=.7, seed=20261008)
+        with patch.object(provider, "post", side_effect=[{}, {"done": True, "message": answer()}]) as post:
+            provider.complete([], [])
+        self.assertEqual(post.call_args.args[1]["options"], {
+            "num_ctx": 32768, "num_predict": 1600, "temperature": .7, "seed": 20261008})
+
+    def test_model_identity_is_fresh_metadata_only_and_requires_unique_digest(self):
+        provider = OllamaProvider("local-model")
+        inventory = {"models": [{"name": "local-model:latest", "digest": "a" * 64}]}
+        payloads = [io.BytesIO(json.dumps(x).encode()) for x in (
+            {"capabilities": ["tools"], "template": "synthetic template"}, inventory,
+            {"capabilities": [], "template": "changed template"}, inventory)]
+        with patch.object(provider.opener, "open", side_effect=payloads) as opening:
+            first = provider.inspect_identity()
+            second = provider.inspect_identity()
+        self.assertNotEqual(first["metadata_sha256"], second["metadata_sha256"])
+        self.assertEqual(first["digest"], "a" * 64)
+        self.assertNotIn("template", first)
+        self.assertFalse(second["supports_tools"])
+        self.assertEqual([x.args[0].get_method() for x in opening.call_args_list], ["POST", "GET", "POST", "GET"])
+        for bad in ({"models": []}, {"models": [inventory["models"][0]] * 2},
+                    {"models": [{"name": "local-model", "digest": "bad"}]},
+                    {"models": [{"name": "local-model", "digest": "a" * 64, "remote_model": "remote"}]}):
+            with patch.object(provider, "_request", side_effect=[{}, bad]):
+                with self.assertRaises(ProviderError):
+                    provider.inspect_identity()
+
+    def test_response_metrics_do_not_retain_messages_or_stale_results(self):
+        provider = OllamaProvider("local-model")
+        result = {"done": True, "message": answer("synthetic private response"), "eval_count": 8,
+                  "prompt_eval_count": 20, "done_reason": "length", "total_duration": True,
+                  "eval_duration": -1, "unrecognized": "private"}
+        with patch.object(provider, "post", side_effect=[{}, result, ProviderError("offline")]):
+            provider.complete([], [])
+            self.assertEqual(provider.last_metrics, {"eval_count": 8, "prompt_eval_count": 20, "done_reason": "length"})
+            with self.assertRaises(ProviderError):
+                provider.complete([], [])
+        self.assertEqual(provider.last_metrics, {})
+
     def test_full_cli_against_loopback_http_stub(self):
         requests = []
 
@@ -206,6 +253,7 @@ class OllamaTransportTests(unittest.TestCase):
             env = {**os.environ, "PYTHONUTF8": "1"}
             result = subprocess.run([sys.executable, str(ROOT / "直接对话/scripts/persona.py"),
                                      "chat", "kongzi", "--preview", "--provider", "ollama", "--model", "stub-local",
+                                     "--temperature", "0.7", "--seed", "20261008",
                                      "--base-url", f"http://127.0.0.1:{server.server_port}", "--prompt", "学习的依据是什么？"],
                                     capture_output=True, text=True, encoding="utf-8", env=env, timeout=15)
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -213,6 +261,8 @@ class OllamaTransportTests(unittest.TestCase):
             self.assertIn("默认不保存对话", result.stderr)
             self.assertEqual([p for p, _ in requests], ["/api/show", "/api/chat", "/api/chat"])
             self.assertEqual(requests[-1][1]["messages"][-1]["role"], "tool")
+            self.assertEqual(requests[-1][1]["options"]["temperature"], .7)
+            self.assertEqual(requests[-1][1]["options"]["seed"], 20261008)
         finally:
             server.shutdown()
             server.server_close()

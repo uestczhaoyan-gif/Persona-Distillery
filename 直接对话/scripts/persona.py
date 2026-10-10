@@ -31,6 +31,8 @@ def main(argv: list[str] | None = None) -> int:
             child.add_argument("--timeout", type=float, default=60)
             child.add_argument("--num-ctx", type=int, default=32768)
             child.add_argument("--max-output-tokens", type=int, default=1600)
+            child.add_argument("--temperature", type=float, default=None)
+            child.add_argument("--seed", type=int, default=None)
             child.add_argument("--prompt", help="Single turn; otherwise interactive")
             child.add_argument("--resume", help="Resume an explicitly saved summary")
         if command == "search":
@@ -44,7 +46,8 @@ def main(argv: list[str] | None = None) -> int:
             from ollama_provider import OllamaProvider
             # Admission precedes even the metadata request.
             resolve_persona(args.name, args.root, args.preview)
-            provider = OllamaProvider(args.model, args.base_url, args.timeout, args.num_ctx, args.max_output_tokens)
+            provider = OllamaProvider(args.model, args.base_url, args.timeout, args.num_ctx, args.max_output_tokens,
+                                      temperature=args.temperature, seed=args.seed)
             provider.prepare()
             session = ChatSession(args.name, provider, args.root, args.preview, args.max_chars,
                                   prompt_profile=args.prompt_profile)
