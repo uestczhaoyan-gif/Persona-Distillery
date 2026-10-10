@@ -4,13 +4,13 @@ from __future__ import annotations
 import copy
 import json
 
-from candidate_records import fingerprint, normalize_candidates
+from candidate_records import fingerprint, normalize_candidates, text
 from candidate_review import prepare_review
 from package_policy import authorize_operation, ExecutionTarget
 
 
 def merge_history(history: list[dict], current_chunks: list[dict], policy: dict, *,
-                  previous_history: list[str] | None = None) -> dict:
+                  previous_history: list[str] | None = None, resolutions: list[dict] | None = None) -> dict:
     """Pure local API. Storage adapters must bind all history items to the same job."""
     authorize_operation([policy], "read", ExecutionTarget("local", False))
     if (not isinstance(history, list) or not 1 <= len(history) <= 100
@@ -62,24 +62,50 @@ def merge_history(history: list[dict], current_chunks: list[dict], policy: dict,
                 variant["lineage"]["record_id"] = entry["stable_id"]
                 variant["history_sha256"] = history_id
             entry["variants"].append(variant)
+    choices = {}
+    if resolutions is not None:
+        if not isinstance(resolutions, list) or len(resolutions) > len(entries):
+            raise ValueError("Invalid conflict resolution list")
+        for resolution in resolutions:
+            fields = {"origin_sha256", "variants_sha256", "chosen_history_sha256", "reviewer", "reason"}
+            if not isinstance(resolution, dict) or set(resolution) != fields:
+                raise ValueError("Invalid conflict resolution fields")
+            origin = resolution["origin_sha256"]
+            if not isinstance(origin, str) or origin not in entries or origin in choices:
+                raise ValueError("Unknown or duplicate conflict target")
+            choice = copy.deepcopy(resolution)
+            choice["reviewer"] = text(choice["reviewer"], limit=120)
+            choice["reason"] = text(choice["reason"], limit=2000)
+            choices[origin] = choice
     for entry in entries.values():
         variants = entry["variants"]
         # Distinct decisions are never silently replaced, including rejection after acceptance.
         outcomes = {fingerprint({"record": v["record"], "lineage": v["lineage"]}) for v in variants}
+        choice = choices.get(entry["origin_sha256"])
+        selected = variants[0]
+        if choice:
+            if len(outcomes) <= 1 or choice["variants_sha256"] != fingerprint(variants):
+                raise ValueError("Conflict changed; explicit new review required")
+            matches = [v for v in variants if v["history_sha256"] == choice["chosen_history_sha256"]]
+            if len(matches) != 1:
+                raise ValueError("Chosen conflict version is unavailable")
+            selected = matches[0]
+            entry["resolution"] = choice
+        references = [selected] if choice else variants
         refs_valid = all(current.get(ref["chunk_id"]) == ref["checksum"]
-                         for v in variants if v["lineage"] for ref in v["lineage"]["chunk_refs"])
+                         for v in references if v["lineage"] for ref in v["lineage"]["chunk_refs"])
         if not refs_valid:
             state = "withdrawn"
-        elif len(outcomes) > 1:
+        elif len(outcomes) > 1 and not choice:
             state = "review_required"
-        elif variants[0]["action"] == "reject":
+        elif selected["action"] == "reject":
             state = "rejected"
         else:
             state = "active"
         entry["state"] = state
         entry["conflict"] = len(outcomes) > 1
         # Preserve every revision, but only unambiguous, source-valid records are usable.
-        entry["active_record"] = copy.deepcopy(variants[0]["record"]) if state == "active" else None
+        entry["active_record"] = copy.deepcopy(selected["record"]) if state == "active" else None
     output_policy = copy.deepcopy(policy)
     output_policy.update(review_status="candidate", execution_policy={"mode": "local_only", "allowed_services": []},
                          distribution_policy={"mode": "local_only"},

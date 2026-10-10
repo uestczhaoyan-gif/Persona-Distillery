@@ -109,10 +109,12 @@ def read_snapshot(directory, merge_id):
     if index != {"merge.json": checksum} or fingerprint(value) != merge_id:
         raise ValueError("Merge snapshot changed")
     expected = {"schema_version", "config_sha256", "review_ids", "previous_merge", "snapshot_sha256", "catalog"}
-    if value.get("schema_version") == "1.1":
+    if value.get("schema_version") in {"1.1", "1.2"}:
         expected.add("input_fingerprint")
     elif value.get("schema_version") != "1.0":
         raise ValueError("Unknown merge snapshot version")
+    if value.get("schema_version") == "1.2":
+        expected.add("resolutions")
     if set(value) != expected:
         raise ValueError("Invalid merge envelope")
     return value
@@ -134,7 +136,7 @@ def current_material(library, job_id):
 
 
 def save_merge(library: Path, job_id: str, review_ids: list[str], *, previous_merge: str | None = None,
-               confirm_local_storage: bool = False) -> dict:
+               confirm_local_storage: bool = False, resolutions: list[dict] | None = None) -> dict:
     job, _, state = local.load_job(library, job_id, confirm_local_storage=confirm_local_storage)
     if (not isinstance(review_ids, list) or not 1 <= len(review_ids) <= 100
             or any(not isinstance(x, str) for x in review_ids) or len(set(review_ids)) != len(review_ids)):
@@ -150,10 +152,12 @@ def save_merge(library: Path, job_id: str, review_ids: list[str], *, previous_me
             if (previous["config_sha256"] != state["config_sha256"]
                     or review_ids[:len(previous["review_ids"])] != previous["review_ids"]):
                 raise ValueError("Prior merge belongs to another job or history changed")
-        catalog = merge_history(history, chunks, policy,
+        if resolutions is None:
+            resolutions = previous.get("resolutions", []) if previous else []
+        catalog = merge_history(history, chunks, policy, resolutions=resolutions,
                                 previous_history=previous["catalog"]["history_sha256"] if previous else None)
-        envelope = {"schema_version": "1.1", "config_sha256": state["config_sha256"], "review_ids": review_ids,
-                    "previous_merge": previous_merge, **binding, "catalog": catalog}
+        envelope = {"schema_version": "1.2", "config_sha256": state["config_sha256"], "review_ids": review_ids,
+                    "previous_merge": previous_merge, **binding, "catalog": catalog, "resolutions": resolutions}
         merge_id = fingerprint(envelope)
         output = local.plain_path(directory / "merges" / merge_id)
         if output.exists():
@@ -186,13 +190,13 @@ def read_merge(library: Path, job_id: str, merge_id: str, *, confirm_local_stora
         envelope = read_snapshot(directory, merge_id)
         if (envelope["config_sha256"] != state["config_sha256"]
                 or envelope["snapshot_sha256"] != binding["snapshot_sha256"]
-                or (envelope["schema_version"] == "1.1" and envelope["input_fingerprint"] != binding["input_fingerprint"])):
+                or (envelope["schema_version"] in {"1.1", "1.2"} and envelope["input_fingerprint"] != binding["input_fingerprint"])):
             raise ValueError("Merge does not reflect current material")
         ids = envelope["review_ids"]
         if not isinstance(ids, list) or not 1 <= len(ids) <= 100 or any(not isinstance(x, str) for x in ids) or len(set(ids)) != len(ids):
             raise ValueError("Invalid merge review list")
         history = [historical_source(directory, exact_hash(rid), job, state) for rid in ids]
-        if merge_history(history, chunks, policy) != envelope["catalog"]:
+        if merge_history(history, chunks, policy, resolutions=envelope.get("resolutions")) != envelope["catalog"]:
             raise ValueError("Merge catalog does not rebuild from reviewed sources")
         if current_material(library, job_id) != material:
             raise ValueError("Source changed during merge read")

@@ -35,8 +35,8 @@ class LocalMergeTests(unittest.TestCase):
         provider.complete.side_effect = response
         return self.make_review()
 
-    def merge(self, ids, previous=None):
-        return merge.save_merge(self.library, self.job["job"]["id"], ids, previous_merge=previous, confirm_local_storage=True)
+    def merge(self, ids, previous=None, **kwargs):
+        return merge.save_merge(self.library, self.job["job"]["id"], ids, previous_merge=previous, confirm_local_storage=True, **kwargs)
 
     def catalog(self, result):
         return merge.read_snapshot(self.library / self.job["job"]["id"], result["merge_sha256"])["catalog"]
@@ -185,6 +185,7 @@ class LocalMergeTests(unittest.TestCase):
         value = self.read_current(result)
         value["schema_version"] = "1.0"
         value.pop("input_fingerprint")
+        value.pop("resolutions")
         old_id = merge.fingerprint(value)
         output = self.library / self.job["job"]["id"] / "merges" / old_id
         output.mkdir()
@@ -192,6 +193,25 @@ class LocalMergeTests(unittest.TestCase):
         (output / "merge.json").write_bytes(raw)
         (output / "checksums.json").write_text(json.dumps({"merge.json": merge.local.digest(raw)}), encoding="utf-8")
         self.assertEqual(self.read_current({"merge_sha256": old_id}), value)
+
+    def test_conflict_selection_is_persisted_and_inherited(self):
+        first_review = self.prepare()
+        directory = self.library / self.job["job"]["id"]
+        first_envelope = review.read_review(self.library, self.job["job"]["id"], first_review, confirm_local_storage=True)
+        decision = first_envelope["decision"]
+        decision["decisions"][0]["action"] = "reject"
+        second = review.save_review(self.library, self.job["job"]["id"], first_envelope["run_sha256"], decision,
+                                    confirm_local_storage=True)["review_sha256"]
+        unresolved = self.merge([first_review, second])
+        entry = self.catalog(unresolved)["entries"][0]
+        choice = {"origin_sha256": entry["origin_sha256"], "variants_sha256": merge.fingerprint(entry["variants"]),
+                  "chosen_history_sha256": entry["variants"][0]["history_sha256"],
+                  "reviewer": "Synthetic resolver", "reason": "Original fixture choice"}
+        selected = self.merge([first_review, second], unresolved["merge_sha256"], resolutions=[choice])
+        self.assertEqual(self.read_current(selected)["catalog"]["counts"]["active"], 1)
+        inherited = self.merge([first_review, second], selected["merge_sha256"])
+        self.assertEqual(self.read_current(inherited)["resolutions"], [choice])
+        self.assertEqual(self.read_current(unresolved)["catalog"]["counts"]["review_required"], 1)
 
 
 if __name__ == "__main__":

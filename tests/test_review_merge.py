@@ -98,6 +98,51 @@ class ReviewMergeTests(unittest.TestCase):
         self.assertEqual(result["policy"]["distribution_policy"]["mode"], "local_only")
         self.assertFalse(result["publication_approved"])
 
+    def choice(self, result, position=1):
+        entry = result["entries"][0]
+        return {"origin_sha256": entry["origin_sha256"], "variants_sha256": fingerprint(entry["variants"]),
+                "chosen_history_sha256": entry["variants"][position]["history_sha256"],
+                "reviewer": "Synthetic resolver", "reason": "Fixture choice, not actual review"}
+
+    def test_explicit_choice_keeps_both_revisions_and_activates_selected(self):
+        history = [self.source(edit="A"), self.source(edit="B")]
+        unresolved = self.merge(history)
+        choice = self.choice(unresolved)
+        result = self.merge(history, resolutions=[choice])
+        entry = result["entries"][0]
+        self.assertEqual(entry["state"], "active")
+        self.assertEqual(entry["active_record"]["claim"], "B")
+        self.assertEqual(entry["variants"], unresolved["entries"][0]["variants"])
+        self.assertTrue(entry["conflict"])
+        self.assertEqual(entry["resolution"], choice)
+
+    def test_choice_of_rejection_does_not_delete_old_content(self):
+        history = [self.source(), self.source(reject=True)]
+        result = self.merge(history, resolutions=[self.choice(self.merge(history))])
+        self.assertEqual(result["entries"][0]["state"], "rejected")
+        self.assertIsNotNone(result["entries"][0]["variants"][0]["record"])
+
+    def test_new_version_invalidates_old_resolution(self):
+        history = [self.source(edit="A"), self.source(edit="B")]
+        choice = self.choice(self.merge(history))
+        with self.assertRaisesRegex(ValueError, "Conflict changed"):
+            self.merge(history + [self.source(edit="C")], resolutions=[choice])
+
+    def test_choice_never_revives_withdrawn_material(self):
+        history = [self.source(edit="A"), self.source(edit="B")]
+        choice = self.choice(self.merge(history))
+        result = self.merge(history, chunks=[], resolutions=[choice])
+        self.assertEqual(result["entries"][0]["state"], "withdrawn")
+        self.assertIsNone(result["entries"][0]["active_record"])
+
+    def test_unknown_or_duplicate_choice_is_rejected(self):
+        history = [self.source(edit="A"), self.source(edit="B")]
+        choice = self.choice(self.merge(history))
+        for choices in ([choice, choice], [{**choice, "chosen_history_sha256": "0" * 64}],
+                        [{**choice, "origin_sha256": "0" * 64}], [{**choice, "reviewer": ""}]):
+            with self.subTest(choices=choices), self.assertRaises(ValueError):
+                self.merge(history, resolutions=choices)
+
 
 if __name__ == "__main__":
     unittest.main()
