@@ -2,12 +2,70 @@
 from __future__ import annotations
 
 import json
+import copy
 from pathlib import Path
 import re
 
 import local_distill as local
 from local_candidates import checked_snapshot, PROMPT
-from candidate_records import fingerprint, verify_candidates
+from candidate_records import fingerprint, verify_candidates, normalize_candidates, text
+
+
+def prepare_review(bundle: dict, chunks: list[dict], policy: dict, decision: dict) -> dict:
+    """Validate explicit human decisions; this API never invents or performs a review."""
+    raw = verify_candidates(bundle, chunks, policy)
+    required = {"candidates_sha256", "reviewer", "note", "decisions"}
+    if (not isinstance(decision, dict) or set(decision) != required
+            or decision["candidates_sha256"] != fingerprint(bundle)
+            or not isinstance(decision["decisions"], list)):
+        raise ValueError("Review must bind the exact candidate bundle")
+    reviewer = text(decision["reviewer"], limit=120)
+    note = text(decision["note"], limit=2000)
+    originals = {}
+    for name, kind, id_key in (("evidence", "evidence", "evidence_id"),
+                               ("context_memory", "memories", "memory_id")):
+        for record, item in zip(bundle[name], raw[kind]):
+            originals[record[id_key]] = (kind, id_key, record, item)
+    if len(decision["decisions"]) != len(originals):
+        raise ValueError("Every candidate requires an explicit decision")
+    accepted, rejected, edits, seen = [], [], [], set()
+    for entry in decision["decisions"]:
+        if not isinstance(entry, dict) or set(entry) not in (
+                {"record_id", "action", "reason"}, {"record_id", "action", "reason", "replacement"}):
+            raise ValueError("Invalid review decision fields")
+        rid, action = entry["record_id"], entry["action"]
+        if not isinstance(rid, str) or rid not in originals or rid in seen:
+            raise ValueError("Unknown or duplicate review target")
+        seen.add(rid)
+        reason = text(entry["reason"], limit=2000)
+        if action not in ("accept", "reject", "edit") or ("replacement" in entry) != (action == "edit"):
+            raise ValueError("Invalid review action or replacement")
+        kind, id_key, original, item = originals[rid]
+        if action == "reject":
+            rejected.append({"record_id": rid, "reason": reason})
+            continue
+        replacement = entry["replacement"] if action == "edit" else item
+        if (not isinstance(replacement, dict) or not isinstance(replacement.get("chunk_ids"), list)
+                or any(cid not in item["chunk_ids"] for cid in replacement["chunk_ids"])):
+            raise ValueError("Edited records may not add unreviewed source chunks")
+        payload = {"evidence": [], "memories": [], "gaps": []}
+        payload[kind] = [replacement]
+        normalized = normalize_candidates(payload, chunks, policy)
+        field = "evidence" if kind == "evidence" else "context_memory"
+        record = normalized[field][0]
+        record[id_key], record["status"] = rid, "reviewed"
+        lineage = normalized["lineage"][0]
+        lineage["record_id"] = rid
+        accepted.append({"record": record, "lineage": lineage, "action": action, "reason": reason})
+        if action == "edit":
+            edits.append(rid)
+    accepted.sort(key=lambda entry: entry["lineage"]["record_id"])
+    rejected.sort(key=lambda entry: entry["record_id"])
+    return {"schema_version": "1.0", "status": "review_recorded", "delivery_channel": "local_only",
+            "candidates_sha256": fingerprint(bundle), "reviewer": reviewer, "note": note,
+            "policy": copy.deepcopy(bundle["policy"]), "accepted": accepted, "rejected": rejected,
+            "edited_record_ids": sorted(edits), "gaps": copy.deepcopy(bundle["gaps"]),
+            "independent_review_verified": False, "publication_approved": False, "persona_generated": False}
 
 
 def read_run(library: Path, job_id: str, run_id: str, *, confirm_local_storage: bool = False) -> dict:

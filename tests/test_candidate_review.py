@@ -1,5 +1,6 @@
 """Review loading uses only synthetic sources; file hashes are not semantic approval."""
 import json
+import copy
 import unittest
 from unittest.mock import patch
 
@@ -30,6 +31,79 @@ class CandidateVerificationTests(unittest.TestCase):
             change(bundle)
             with self.subTest(change=change), self.assertRaises(ValueError):
                 verify_candidates(bundle, [self.chunk], self.policy)
+
+
+class HumanDecisionTests(unittest.TestCase):
+    setUp = records.CandidateRecordsTests.setUp
+    normalize = records.CandidateRecordsTests.normalize
+
+    def decision(self):
+        return {"candidates_sha256": review.fingerprint(self.normalize()), "reviewer": "Synthetic reviewer",
+                "note": "Original fixture, no actual human review", "decisions": [
+                    {"record_id": "E-0001", "action": "accept", "reason": "Synthetic acceptance"},
+                    {"record_id": "M-0001", "action": "reject", "reason": "Synthetic uncertainty"}]}
+
+    def apply(self, value=None):
+        return review.prepare_review(self.normalize(), [self.chunk], self.policy,
+                                     value if value is not None else self.decision())
+
+    def test_accept_and_reject_are_explicit_and_do_not_publish(self):
+        before = copy.deepcopy((self.payload, self.policy, self.chunk))
+        result = self.apply()
+        self.assertEqual(result["accepted"][0]["record"]["status"], "reviewed")
+        self.assertEqual(result["rejected"][0]["record_id"], "M-0001")
+        self.assertFalse(result["independent_review_verified"])
+        self.assertFalse(result["publication_approved"])
+        self.assertEqual(result["policy"]["distribution_policy"]["mode"], "local_only")
+        self.assertEqual(before, (self.payload, self.policy, self.chunk))
+
+    def test_edit_keeps_original_candidate_and_validates_new_lineage(self):
+        decision = self.decision()
+        replacement = copy.deepcopy(self.evidence)
+        replacement["claim"] = "Human-edited synthetic claim"
+        decision["decisions"][0].update(action="edit", replacement=replacement)
+        result = self.apply(decision)
+        self.assertEqual(result["edited_record_ids"], ["E-0001"])
+        entry = result["accepted"][0]
+        self.assertEqual(entry["record"]["claim"], replacement["claim"])
+        self.assertNotEqual(entry["lineage"]["content_sha256"], self.normalize()["lineage"][0]["content_sha256"])
+        self.assertEqual(entry["lineage"]["chunk_refs"], self.normalize()["lineage"][0]["chunk_refs"])
+
+    def test_hash_mismatch_missing_duplicate_and_extra_decisions_rejected(self):
+        mutations = (
+            lambda d: d.update(candidates_sha256="0" * 64),
+            lambda d: d["decisions"].pop(),
+            lambda d: d["decisions"].append(d["decisions"][0]),
+            lambda d: d["decisions"][1].update(record_id="E-0001"),
+            lambda d: d.update(publication_approved=True),
+            lambda d: d.update(reviewer=""),
+        )
+        for change in mutations:
+            decision = self.decision()
+            change(decision)
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                self.apply(decision)
+
+    def test_new_sources_and_policy_in_edits_rejected(self):
+        for mutation in (lambda r: r.update(chunk_ids=["P-2026-999#C-0001"]),
+                         lambda r: r.update(status="reviewed")):
+            decision = self.decision()
+            replacement = copy.deepcopy(self.evidence)
+            mutation(replacement)
+            decision["decisions"][0].update(action="edit", replacement=replacement)
+            with self.assertRaises(ValueError):
+                self.apply(decision)
+
+    def test_accept_cannot_hide_a_replacement(self):
+        decision = self.decision()
+        decision["decisions"][0]["replacement"] = self.evidence
+        with self.assertRaises(ValueError):
+            self.apply(decision)
+
+    def test_decision_order_does_not_change_review(self):
+        decision = self.decision()
+        decision["decisions"].reverse()
+        self.assertEqual(self.apply(decision), self.apply())
 
 
 class CandidateRunReadTests(unittest.TestCase):
