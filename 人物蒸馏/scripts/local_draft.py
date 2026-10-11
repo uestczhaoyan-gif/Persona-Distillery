@@ -5,6 +5,7 @@ import copy
 import csv
 import io
 import json
+import os
 from pathlib import Path
 
 import local_distill as local
@@ -90,12 +91,14 @@ def _material_locked(library, job_id, review_id):
     return package, files, build_id
 
 
-def _verify_files(package, expected):
-    if (package / ".build-incomplete").exists():
+def _verify_files(package, expected, *, incomplete=False):
+    if not incomplete and (package / ".build-incomplete").exists():
         raise ValueError("Draft build incomplete")
     actual = set()
     for path in package.rglob("*"):
         path = local.plain_path(path)
+        if incomplete and path.name == ".build-incomplete" and path.parent == package:
+            continue
         if path.is_file():
             actual.add(path.relative_to(package).as_posix())
         elif path.relative_to(package).as_posix() != "processed":
@@ -130,6 +133,74 @@ def build_draft(library: Path, job_id: str, review_id: str, *, confirm_local_sto
             _verify_files(package, files)
         return {"ok": True, "status": "draft", "build_sha256": build_id, "avatar_ready": False,
                 "quality_verified": False, "publication_approved": False, "persona_generated": False}
+
+
+def _recovery_plan(package, files, build_id):
+    marker = local.plain_path(package / ".build-incomplete")
+    with marker.open("rb") as handle:
+        if handle.read(128) != b"source-bound local draft in progress\n":
+            raise ValueError("Unknown interrupted build marker")
+    present = {}
+    for path in package.rglob("*"):
+        path = local.plain_path(path)
+        name = path.relative_to(package).as_posix()
+        if name == ".build-incomplete":
+            continue
+        if path.is_dir() and name == "processed":
+            continue
+        if name not in files or not path.is_file():
+            raise ValueError("Unexpected interrupted draft content")
+        with path.open("rb") as handle:
+            data = handle.read(len(files[name]) + 1)
+        if not files[name].startswith(data):
+            raise ValueError("Edited draft file cannot be resumed")
+        present[name] = {"size": len(data), "sha256": local.digest(data)}
+    plan = {"build_sha256": build_id, "present": present,
+            "missing": sorted(set(files) - set(present))}
+    return plan, fingerprint(plan)
+
+
+def plan_resume(library: Path, job_id: str, review_id: str, *, confirm_local_storage=False):
+    """Return only counts and a consent fingerprint; never expose private text."""
+    local.load_job(library, job_id, confirm_local_storage=confirm_local_storage)
+    with local.job_lock(local.job_directory(library, job_id)):
+        package, files, build_id = _material_locked(library, job_id, review_id)
+        plan, plan_id = _recovery_plan(package, files, build_id)
+        return {"plan_sha256": plan_id, "build_sha256": build_id,
+                "missing_files": len(plan["missing"]),
+                "partial_files": sum(v["size"] < len(files[k]) for k, v in plan["present"].items())}
+
+
+def resume_draft(library: Path, job_id: str, review_id: str, plan_sha256: str, *, confirm_local_storage=False):
+    local.load_job(library, job_id, confirm_local_storage=confirm_local_storage)
+    with local.job_lock(local.job_directory(library, job_id)):
+        package, files, build_id = _material_locked(library, job_id, review_id)
+        plan, plan_id = _recovery_plan(package, files, build_id)
+        if exact_hash(plan_sha256) != plan_id:
+            raise ValueError("Recovery plan changed; inspect again")
+        for name, wanted in files.items():
+            path = local.plain_path(package / name)
+            if name in plan["missing"]:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                local.write_new(path, wanted)
+            else:
+                expected = plan["present"][name]
+                # Never truncate, delete, or replace a pre-existing file.
+                with path.open("r+b") as handle:
+                    data = handle.read(len(wanted) + 1)
+                    if len(data) != expected["size"] or local.digest(data) != expected["sha256"]:
+                        raise ValueError("Draft changed during recovery")
+                    if len(data) < len(wanted):
+                        handle.write(wanted[len(data):])
+                        handle.flush()
+                        os.fsync(handle.fileno())
+        if _material_locked(library, job_id, review_id) != (package, files, build_id):
+            raise ValueError("Source changed during recovery")
+        _verify_files(package, files, incomplete=True)
+        local.plain_path(package / ".build-incomplete").unlink()
+        return {"ok": True, "status": "draft", "build_sha256": build_id,
+                "avatar_ready": False, "quality_verified": False, "publication_approved": False,
+                "persona_generated": False}
 
 
 def verify_draft(package: Path):

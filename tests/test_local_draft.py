@@ -110,6 +110,68 @@ class LocalDraftTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 local_package.load_local_context(self.output, confirm_local_storage=True, preview=True)
 
+    def interrupted(self):
+        self.setup_review()
+        self.review_id = self.save_review()["review_sha256"]
+        original = draft.local.write_new
+        def fail(path, data):
+            if path.name == "02-evidence.md":
+                original(path, data[:17])
+                raise OSError("Synthetic interrupted write")
+            return original(path, data)
+        with patch.object(draft.local, "write_new", side_effect=fail), self.assertRaises(OSError):
+            self.create()
+        self.output = next((self.base / "personas-output").glob("*/*"))
+
+    def recovery_plan(self):
+        return draft.plan_resume(self.library, self.job["job"]["id"], self.review_id, confirm_local_storage=True)
+
+    def resume(self, plan):
+        return draft.resume_draft(self.library, self.job["job"]["id"], self.review_id,
+                                  plan["plan_sha256"], confirm_local_storage=True)
+
+    def test_explicit_recovery_finishes_only_missing_and_partial_files(self):
+        self.interrupted()
+        original = (self.output / "00-profile.md").read_bytes()
+        plan = self.recovery_plan()
+        self.assertEqual(plan["partial_files"], 1)
+        self.assertGreater(plan["missing_files"], 0)
+        self.assertFalse(self.resume(plan)["persona_generated"])
+        self.assertEqual((self.output / "00-profile.md").read_bytes(), original)
+        self.assertTrue(draft.verify_draft(self.output))
+        with self.assertRaises(OSError):
+            self.recovery_plan()
+
+    def test_recovery_refuses_changed_plan_and_preserves_marker(self):
+        self.interrupted()
+        plan = self.recovery_plan()
+        path = self.output / "02-evidence.md"
+        path.write_bytes(path.read_bytes()[:10])
+        with self.assertRaisesRegex(ValueError, "plan changed"):
+            self.resume(plan)
+        self.assertTrue((self.output / ".build-incomplete").exists())
+        self.resume(self.recovery_plan())
+        self.assertTrue(draft.verify_draft(self.output))
+
+    def test_recovery_refuses_edits_extra_files_and_withdrawal(self):
+        self.interrupted()
+        path = self.output / "02-evidence.md"
+        original = path.read_bytes()
+        path.write_bytes(b"edited synthetic content")
+        with self.assertRaises(ValueError):
+            self.recovery_plan()
+        path.write_bytes(original)
+        extra = self.output / "extra.txt"
+        extra.write_bytes(b"synthetic")
+        with self.assertRaises(ValueError):
+            self.recovery_plan()
+        extra.unlink()
+        plan = self.recovery_plan()
+        (self.incoming / "source.txt").unlink()
+        with self.assertRaises(ValueError):
+            self.resume(plan)
+        self.assertTrue((self.output / ".build-incomplete").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
