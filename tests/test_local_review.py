@@ -64,6 +64,31 @@ class LocalReviewTests(unittest.TestCase):
         self.assertNotIn("\x1b", output)
         self.assertIn("\\u001b", output)
 
+    def test_spec_template_is_bound_and_not_an_approval(self):
+        self.setup_review()
+        code, output, _ = self.run_cli("template-spec", "--spec", self.spec_id)
+        self.assertEqual(code, 0)
+        value = json.loads(output)
+        self.assertEqual(value["spec_content_sha256"], self.decision["spec_content_sha256"])
+        with self.assertRaises(ValueError):
+            cli.spec_review.prepare_decision(self.current, value)
+        value.update(action="reject", reviewer="Synthetic human", note="Original fixture lacks evidence")
+        self.assertEqual(cli.spec_review.prepare_decision(self.current, value)["action"], "reject")
+
+    def test_candidate_template_enumerates_exact_records_without_decisions(self):
+        self.prepare()
+        directory = self.library / self.job["job"]["id"] / "candidates"
+        run_id = next(directory.iterdir()).name
+        code, output, _ = self.run_cli("template-candidate", "--run", run_id)
+        self.assertEqual(code, 0)
+        value = json.loads(output)
+        current = cli.candidate_review.read_run(self.library, self.job["job"]["id"], run_id, confirm_local_storage=True)
+        self.assertEqual(value["candidates_sha256"], current["candidates_sha256"])
+        self.assertEqual([x["record_id"] for x in value["decisions"]], ["E-0001"])
+        self.assertTrue(all(x["action"] == "" for x in value["decisions"]))
+        with self.assertRaises(ValueError):
+            cli.candidate_review.prepare_review(current["bundle"], current["chunks"], current["policy"], value)
+
 
 if __name__ == "__main__":
     unittest.main()

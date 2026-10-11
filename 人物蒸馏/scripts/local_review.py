@@ -9,6 +9,7 @@ import candidate_review
 import spec_review
 import local_merge
 import local_draft
+from candidate_records import fingerprint
 
 
 def decision_file(args):
@@ -27,6 +28,7 @@ def main(argv=None):
     parser.add_argument("--confirm-local-storage", action="store_true")
     commands = parser.add_subparsers(dest="command", required=True)
     for name, field in (("inspect-candidate", "run"), ("review-candidate", "run"),
+                        ("template-candidate", "run"), ("template-spec", "spec"),
                         ("inspect-spec", "spec"), ("review-spec", "spec"),
                         ("build-draft", "review"), ("plan-resume", "review"), ("resume-draft", "review")):
         command = commands.add_parser(name)
@@ -46,12 +48,20 @@ def main(argv=None):
         if not args.confirm_local_storage:
             raise ValueError("Local storage confirmation required")
         common = {"confirm_local_storage": True}
-        if args.command == "inspect-candidate":
+        if args.command in {"inspect-candidate", "template-candidate"}:
             result = candidate_review.read_run(args.library, args.job, args.run, **common)
+            if args.command == "template-candidate":
+                bundle = result["bundle"]
+                result = {"candidates_sha256": fingerprint(bundle), "reviewer": "", "note": "",
+                          "decisions": [{"record_id": record[key], "action": "", "reason": ""}
+                                        for field, key in (("evidence", "evidence_id"), ("context_memory", "memory_id"))
+                                        for record in bundle[field]]}
         elif args.command == "review-candidate":
             result = candidate_review.save_review(args.library, args.job, args.run, decision_file(args), **common)
-        elif args.command == "inspect-spec":
+        elif args.command in {"inspect-spec", "template-spec"}:
             result = spec_review.read_spec(args.library, args.job, args.spec, **common)
+            if args.command == "template-spec":
+                result = {"spec_content_sha256": result["spec_content_sha256"], "action": "", "reviewer": "", "note": ""}
         elif args.command == "review-spec":
             result = spec_review.save_spec_review(args.library, args.job, args.spec, decision_file(args), **common)
         elif args.command == "merge":
