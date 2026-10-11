@@ -3,7 +3,7 @@ import copy
 import unittest
 
 import test_review_merge as fixtures
-from spec_candidate import normalize_spec, spec_material
+from spec_candidate import normalize_spec, spec_material, verify_spec
 
 
 class SpecCandidateTests(unittest.TestCase):
@@ -62,13 +62,26 @@ class SpecCandidateTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             normalize_spec(self.spec, catalog)
 
-    def test_empty_sections_allowed_but_whitespace_and_fake_examples_rejected(self):
+    def test_empty_sections_allowed_but_whitespace_rejected(self):
         spec = copy.deepcopy(self.spec)
         spec["attention"], spec["anchors"], spec["examples"] = [], [], []
         self.assertEqual(normalize_spec(spec, self.catalog)["candidate"]["anchors"], [])
         spec["profile"]["description"] = " "
         with self.assertRaises(ValueError):
             normalize_spec(spec, self.catalog)
+
+    def test_normalized_spec_reconstructs_original_payload(self):
+        candidate = normalize_spec(self.spec, self.catalog)
+        self.assertEqual(verify_spec(candidate, self.catalog), self.spec)
+
+    def test_changed_example_provenance_and_model_completion_flags_rejected(self):
+        for change in (lambda c: c["candidate"]["examples"][0].update(provenance="real_quote"),
+                       lambda c: c.update(persona_generated=True),
+                       lambda c: c.update(record_sha256={})):
+            candidate = normalize_spec(self.spec, self.catalog)
+            change(candidate)
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                verify_spec(candidate, self.catalog)
         spec = copy.deepcopy(self.spec)
         spec["examples"][0]["provenance"] = "historical_quote"
         with self.assertRaises(ValueError):

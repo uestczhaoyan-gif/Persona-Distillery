@@ -73,3 +73,16 @@ def normalize_spec(payload: dict, catalog: dict) -> dict:
             "record_sha256": {rid: fingerprint(record) for rid, record in lookup.items()},
             "candidate": candidate, "behavior_mode": "optional_tendencies_not_response_template",
             "semantic_review_completed": False, "avatar_ready": False, "persona_generated": False}
+
+
+def verify_spec(candidate: dict, catalog: dict) -> dict:
+    try:
+        raw = copy.deepcopy(candidate["candidate"])
+        for example in raw["examples"]:
+            if example.pop("provenance") != "original_simulation_not_quote":
+                raise ValueError("Spec example provenance changed")
+        if normalize_spec(raw, catalog) != candidate:
+            raise ValueError("Spec content or derived fields changed")
+        return raw
+    except (KeyError, TypeError, AttributeError):
+        raise ValueError("Invalid normalized spec candidate") from None

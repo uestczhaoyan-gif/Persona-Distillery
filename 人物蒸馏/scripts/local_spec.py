@@ -30,6 +30,13 @@ Examples must be original simulations, never historical quotes, real conversatio
 Do not claim independent verification, readiness, avatar creation, publication or real human approval."""
 
 
+def spec_messages(catalog):
+    records = spec_material(catalog)
+    schema = local.read_json(local.ROOT / "人物蒸馏/schemas/persona-spec-candidate.schema.json")
+    return [{"role": "system", "content": PROMPT + "\nSchema:\n" + local.canonical(schema)},
+            {"role": "user", "content": local.canonical({"records": records})}]
+
+
 def generate_spec(library: Path, job_id: str, merge_id: str, model: str, *, confirm_local_storage=False,
                   confirm_local_service=False, base_url="http://127.0.0.1:11434") -> dict:
     if not confirm_local_storage or not confirm_local_service:
@@ -44,10 +51,7 @@ def generate_spec(library: Path, job_id: str, merge_id: str, model: str, *, conf
         merged = _read_merge_locked(library, job_id, merge_id, confirm_local_storage=True)
         catalog = merged["catalog"]
         authorize_operation([catalog["policy"]], "infer", ExecutionTarget("local", False))
-        records = spec_material(catalog)
-        schema = local.read_json(local.ROOT / "人物蒸馏/schemas/persona-spec-candidate.schema.json")
-        messages = [{"role": "system", "content": PROMPT + "\nSchema:\n" + local.canonical(schema)},
-                    {"role": "user", "content": local.canonical({"records": records})}]
+        messages = spec_messages(catalog)
         if len(local.canonical(messages).encode("utf-8")) > 50000:
             raise ValueError("Spec input exceeds single-batch capacity; no automatic truncation")
         binding = {"schema_version": "1.0", "kind": "local_spec_candidate", "merge_sha256": merge_id,
