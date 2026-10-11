@@ -75,6 +75,36 @@ class LocalReviewTests(unittest.TestCase):
         value.update(action="reject", reviewer="Synthetic human", note="Original fixture lacks evidence")
         self.assertEqual(cli.spec_review.prepare_decision(self.current, value)["action"], "reject")
 
+    def test_attempt_listing_reads_no_candidate_body_and_never_claims_current(self):
+        from pathlib import Path
+        self.setup_review()
+        original = Path.open
+        def guarded(path, *args, **kwargs):
+            if path.name in {"candidates.json", "spec-candidate.json", "chunks.jsonl", "review.json"}:
+                raise AssertionError("Attempt listing read a private body")
+            return original(path, *args, **kwargs)
+        with patch.object(Path, "open", guarded):
+            code, output, error = self.run_cli("attempts")
+        self.assertEqual(code, 0, error)
+        entries = json.loads(output)["attempts"]
+        self.assertEqual(len(entries), 2)
+        self.assertTrue(all(v["binding_valid"] and not v["current_source_verified"] for v in entries))
+        self.assertTrue(all(v["state"] == "recorded_unverified" for v in entries))
+        self.assertNotIn("Original", output)
+
+    def test_attempt_listing_reports_partial_binding_without_private_diagnostic(self):
+        self.ready()
+        root = self.library / self.job["job"]["id"] / "candidates" / ("a" * 64)
+        root.mkdir(parents=True)
+        (root / ".incomplete").write_text("Synthetic interruption", encoding="utf-8")
+        (root / "binding.json").write_text("PRIVATE INVALID BODY", encoding="utf-8")
+        code, output, _ = self.run_cli("attempts")
+        self.assertEqual(code, 0)
+        entry = json.loads(output)["attempts"][0]
+        self.assertFalse(entry["binding_valid"])
+        self.assertEqual(entry["state"], "incomplete")
+        self.assertNotIn("PRIVATE", output)
+
     def test_candidate_template_enumerates_exact_records_without_decisions(self):
         self.prepare()
         directory = self.library / self.job["job"]["id"] / "candidates"

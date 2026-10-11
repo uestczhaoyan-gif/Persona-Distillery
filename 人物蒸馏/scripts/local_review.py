@@ -9,6 +9,7 @@ import candidate_review
 import spec_review
 import local_merge
 import local_draft
+import local_retry
 from candidate_records import fingerprint
 
 
@@ -27,6 +28,7 @@ def main(argv=None):
     parser.add_argument("--job", required=True)
     parser.add_argument("--confirm-local-storage", action="store_true")
     commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("attempts")
     for name, field in (("inspect-candidate", "run"), ("review-candidate", "run"),
                         ("template-candidate", "run"), ("template-spec", "spec"),
                         ("inspect-spec", "spec"), ("review-spec", "spec"),
@@ -48,7 +50,9 @@ def main(argv=None):
         if not args.confirm_local_storage:
             raise ValueError("Local storage confirmation required")
         common = {"confirm_local_storage": True}
-        if args.command in {"inspect-candidate", "template-candidate"}:
+        if args.command == "attempts":
+            result = local_retry.list_attempts(args.library, args.job, **common)
+        elif args.command in {"inspect-candidate", "template-candidate"}:
             result = candidate_review.read_run(args.library, args.job, args.run, **common)
             if args.command == "template-candidate":
                 bundle = result["bundle"]
