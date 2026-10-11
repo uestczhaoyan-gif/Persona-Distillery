@@ -261,9 +261,11 @@ def approve(library: Path, job_id: str, gates: list[str], review_record: Path, *
 
 
 def build(library: Path, job_id: str, *, confirm_local_storage: bool,
-          update: bool = False, workspace: Path = ROOT) -> dict:
+          update: bool = False, reparse: bool = False, workspace: Path = ROOT) -> dict:
     if confirm_local_storage is not True:
         raise ValueError("Confirm local storage before preparing inputs")
+    if reparse and not update:
+        raise ValueError("Explicit reparse requires update")
     directory = job_directory(library, job_id, workspace)
     with job_lock(directory):
         job, paths, state = load_job(library, job_id, confirm_local_storage=confirm_local_storage, workspace=workspace)
@@ -276,7 +278,7 @@ def build(library: Path, job_id: str, *, confirm_local_storage: bool,
         fingerprint, entries = input_inventory(paths)
         if state["approvals"].get("material", {}).get("fingerprint") != fingerprint:
             return pause("material_review")
-        if state.get("input_fingerprint") == fingerprint:
+        if state.get("input_fingerprint") == fingerprint and not reparse:
             verify_snapshot(directory, state)
             return state
         if state.get("input_fingerprint") and not update:
@@ -368,6 +370,7 @@ def build(library: Path, job_id: str, *, confirm_local_storage: bool,
         write_new(snapshot / "chunks.jsonl", ("\n".join(canonical(item) for item in chunks) + "\n").encode("utf-8"))
         active = sorted(item["source_id"] for item in sources)
         report = {"pipeline_version": PIPELINE_VERSION, "revision": revision, "chunks": len(chunks),
+                  "explicit_reparse": reparse,
                   "unique_text_sources": len(sources), "independent_sources_verified": False,
                   "persona_generated": False, "evidence_cards": 0, "network_requests": 0,
                   "privacy_screening_complete": False, "findings": findings, "quarantined": quarantined,
@@ -400,6 +403,7 @@ def main(argv: list[str] | None = None) -> int:
     prepare = commands.add_parser("build")
     prepare.add_argument("--job", required=True)
     prepare.add_argument("--update", action="store_true")
+    prepare.add_argument("--reparse", action="store_true", help="Reparse unchanged inputs into a new snapshot; requires --update")
     review = commands.add_parser("approve")
     review.add_argument("--job", required=True)
     review.add_argument("--gate", nargs="+", choices=("identity", "material", "sensitivity"), required=True)
@@ -411,7 +415,7 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "approve":
             state = approve(args.library, args.job, args.gate, args.record, confirm_local_storage=args.confirm_local_storage)
         elif args.command == "build":
-            state = build(args.library, args.job, confirm_local_storage=args.confirm_local_storage, update=args.update)
+            state = build(args.library, args.job, confirm_local_storage=args.confirm_local_storage, update=args.update, reparse=args.reparse)
         else:
             _, _, state = load_job(args.library, args.job, confirm_local_storage=args.confirm_local_storage)
             if state.get("snapshot"):

@@ -41,6 +41,18 @@ class PdfJobTests(unittest.TestCase):
         import json
         report = json.loads((self.snapshot(state) / "report.json").read_text(encoding="utf-8"))
         self.assertIn("pdf_dependency_missing", str(report))
+        self.assertEqual(self.build(), state)
+        import local_distill
+        with self.assertRaisesRegex(ValueError, "requires update"):
+            local_distill.build(self.library, self.job["job"]["id"], confirm_local_storage=True, reparse=True)
+        updated = local_distill.build(self.library, self.job["job"]["id"], confirm_local_storage=True,
+                                     update=True, reparse=True)
+        self.assertNotEqual(updated["snapshot"], state["snapshot"])
+        current = json.loads((self.snapshot(updated) / "report.json").read_text(encoding="utf-8"))
+        self.assertTrue(current["explicit_reparse"])
+        self.assertEqual(current["quarantined"], [])
+        self.assertEqual(current["unique_text_sources"], 2)
+        self.assertEqual(json.loads((self.snapshot(state) / "report.json").read_text(encoding="utf-8")), report)
 
 
 if __name__ == "__main__":
