@@ -253,7 +253,7 @@ def transition(session_id: str, action: str, root: Path = ROOT, text: str = "") 
         return session
 
 
-def request_turn(session_id: str, speaker: str | None = None, root: Path = ROOT) -> dict:
+def request_turn(session_id: str, speaker: str | None = None, root: Path = ROOT, *, moderated: bool = False) -> dict:
     path = directory(session_id, root)
     with locked(path):
         bundle = load(path, root)
@@ -263,6 +263,12 @@ def request_turn(session_id: str, speaker: str | None = None, root: Path = ROOT)
             raise ValueError("Session must be running without an active request")
         if len(bundle["turns"]) >= session["limits"]["max_turns"]:
             raise ValueError("Turn limit reached")
+        decision = None
+        if moderated:
+            from roundtable_moderator import choose
+            decision = choose(bundle, speaker)
+            validate(decision, "moderator-decision", root)
+            speaker = decision["next_speaker"]
         speaker = speaker or session["current"]["next_speaker"]
         if speaker not in {p["person_id"] for p in session["participants"]}:
             raise ValueError("Unknown speaker")
@@ -271,6 +277,8 @@ def request_turn(session_id: str, speaker: str | None = None, root: Path = ROOT)
                   "turn_id": f"{session_id}-T-{len(bundle['turns'])+1:04d}", "state_version": session["state_version"],
                   "speaker_id": speaker, "sequence": len(bundle["turns"]) + 1,
                   "section_index": session["current"]["section_index"]}
+        if decision is not None:
+            ticket["moderator_decision"] = decision
         session["active_generation"] = {key: ticket[key] for key in ("request_id", "turn_id", "state_version")}
         session["active_generation"].update(status="running", started_at=now())
         bundle["runtime"]["ticket"] = ticket
@@ -300,6 +308,9 @@ def commit_turn(ticket: dict, turn: dict, root: Path = ROOT) -> dict:
             if target not in known_turns | known_claims | known_events | {"opening"}:
                 raise ValueError("Response target does not exist")
         pending = session["current"]["pending_user_event_id"]
+        decision = ticket.get("moderator_decision")
+        if decision and not set(decision["responds_to"]).issubset(turn["responds_to"]):
+            raise ValueError("Turn must address the moderator target")
         if pending and pending not in turn["responds_to"]:
             raise ValueError("Turn must address the pending user interjection")
         new_claims = [c["claim_id"] for c in turn["claims"]]

@@ -92,6 +92,7 @@ def context(ticket, root):
                  "speaker_id": ticket["speaker_id"], "max_chars": session["limits"]["max_chars_per_turn"],
                  "persona": documents, "evidence": evidence,
                  "retrieval": {"method": "lexical_overlap", "limit": 6, "exhaustive": False},
+                 "moderator": ticket.get("moderator_decision"),
                  "turns": bundle["turns"], "user_events": bundle["events"],
                  "pending_user_event_id": session["current"]["pending_user_event_id"]}
         content = json.dumps(value, ensure_ascii=False)
@@ -147,7 +148,7 @@ def generate_turn(session_id, model, *, root=rt.ROOT, speaker=None, confirm_loca
     root = Path(root)
     provider = OllamaProvider(model, base_url=base_url, max_output_tokens=4000, temperature=0.7)
     identity = provider.inspect_identity()
-    ticket = rt.request_turn(session_id, speaker=speaker, root=root)
+    ticket = rt.request_turn(session_id, speaker=speaker, root=root, moderated=True)
     try:
         messages = context(ticket, root)
         response = provider.complete(messages, [])

@@ -136,6 +136,55 @@ class RoundtableRunnerTests(unittest.TestCase):
         path.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in records), encoding="utf-8")
         self.assertEqual(runner.retrieve_evidence(package, manifest, "学习 判断"), [])
 
+    def test_three_person_six_turns_with_interjection_and_explicit_targets(self):
+        import shutil
+        original = fixtures.rt.read_json(fixtures.ROOT / "圆桌会议/_template/session.example.json")
+        self.config["participants"] = original["participants"]
+        self.config["limits"]["max_turns"] = 6
+        source = fixtures.ROOT / "personas/richard-feynman"
+        target = self.root / "personas/richard-feynman"
+        target.mkdir()
+        manifest = fixtures.rt.read_json(source / "manifest.json")
+        shutil.copyfile(source / "manifest.json", target / "manifest.json")
+        for role in ("persona_spec", "core_anchors", "dialogue_examples", "profile", "sources", "evidence",
+                     "context_memory", "structured_evidence", "structured_context_memory"):
+            if role in manifest["files"]:
+                path = target / manifest["files"][role]
+                path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source / manifest["files"][role], path)
+        self.start()
+        self.provider()
+        seen = []
+        def answer(messages, tools):
+            value = json.loads(messages[1]["content"])
+            decision = value["moderator"]
+            seen.append(decision)
+            response = dict(self.raw, responds_to=decision["responds_to"], stance="clarify")
+            return {"content": json.dumps(response)}
+        self.model.complete.side_effect = answer
+        for i in range(6):
+            if i == 3:
+                fixtures.rt.transition(self.identifier, "interject", self.root, text="Original hypothetical constraint")
+                fixtures.rt.transition(self.identifier, "resume", self.root)
+            self.assertTrue(self.generate()["accepted"])
+        state = self.state()
+        self.assertEqual(state["session"]["status"], "finishing")
+        self.assertEqual([t["speaker_id"] for t in state["turns"][:3]], ["kongzi", "zhuangzi", "richard-feynman"])
+        self.assertEqual(seen[3]["responds_to"], [state["events"][0]["event_id"]])
+        self.assertTrue(seen[4]["responds_to"][0].startswith("C-"))
+        self.assertEqual(self.model.complete.call_count, 6)
+
+    def test_ignoring_moderator_target_is_refused(self):
+        self.config["limits"]["max_turns"] = 4
+        self.start()
+        self.provider()
+        self.generate()
+        self.generate()
+        with self.assertRaises(ValueError):
+            self.generate()
+        self.assertEqual(len(self.state()["turns"]), 2)
+        self.assertEqual(self.state()["session"]["status"], "paused")
+
 
 if __name__ == "__main__":
     unittest.main()
