@@ -163,6 +163,15 @@ def persist(path: Path, bundle: dict, root: Path) -> None:
         essay += "## 分歧\n\n" + "\n".join("- " + value["summary"] for value in article["disagreements"]) + "\n\n"
         essay += "## 未决问题\n\n" + "\n".join("- " + value for value in article["open_questions"]) + "\n"
         artifacts["essay.md"] = essay
+        artifacts["essay.md"] += "\n## 编辑说明\n\n" + "\n".join("- " + note for note in article["editorial_notes"]) + "\n"
+        links = ["\n\n## 文稿回链", "背景见 article.json；自动成稿器使用会话议题与目标。"]
+        for kind in ("development", "disagreements"):
+            for i, section in enumerate(article[kind], 1):
+                links.append(f"- {kind}/{i}：" + ", ".join(section["turn_ids"]))
+        for kind, references in article.get("section_refs", {}).items():
+            for i, ids in enumerate(references, 1):
+                links.append(f"- {kind}/{i}：" + ", ".join(ids))
+        artifacts["provenance.md"] += "\n".join(links) + "\n"
     for name, content in artifacts.items():
         atomic(snapshot / name, content)
     pointer = {"snapshot": snapshot.relative_to(path).as_posix(), "state_version": session["state_version"],
@@ -356,13 +365,16 @@ def commit_turn(ticket: dict, turn: dict, root: Path = ROOT) -> dict:
         return {"accepted": True, "status": session["status"], "state_version": session["state_version"]}
 
 
-def complete(session_id: str, article: dict, root: Path = ROOT) -> dict:
+def complete(session_id: str, article: dict, root: Path = ROOT, *, expected_version=None) -> dict:
     path = directory(session_id, root)
     with locked(path):
         bundle = load(path, root)
         session = bundle["session"]
         if session["status"] != "finishing":
             raise ValueError("Article completion requires finishing state")
+        if expected_version is not None and session["state_version"] != expected_version:
+            raise ValueError("Editor source snapshot changed")
+        check_pins(bundle["runtime"], root)
         validate(article, "article", root)
         ids = {turn["turn_id"] for turn in bundle["turns"]}
         if article["session_id"] != session_id or set(article["source_turn_ids"]) - ids or not article["source_turn_ids"]:
@@ -373,6 +385,9 @@ def complete(session_id: str, article: dict, root: Path = ROOT) -> dict:
                 raise ValueError("Article paragraph references must be included in its existing source turns")
             if "participants" in section and set(section["participants"]) - participants:
                 raise ValueError("Article disagreement cites unknown participants")
+        for kind, references in article.get("section_refs", {}).items():
+            if len(references) != len(article[kind]) or any(set(refs) - set(article["source_turn_ids"]) for refs in references):
+                raise ValueError("Article summary references must match existing paragraphs and turns")
         if article["simulation_notice"] != NOTICE:
             raise ValueError("Article must retain the simulation notice")
         bundle["article"] = copy.deepcopy(article)
