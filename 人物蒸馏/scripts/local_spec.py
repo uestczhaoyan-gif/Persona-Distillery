@@ -38,7 +38,7 @@ def spec_messages(catalog):
 
 
 def generate_spec(library: Path, job_id: str, merge_id: str, model: str, *, confirm_local_storage=False,
-                  confirm_local_service=False, base_url="http://127.0.0.1:11434") -> dict:
+                  confirm_local_service=False, base_url="http://127.0.0.1:11434", retry_of=None) -> dict:
     if not confirm_local_storage or not confirm_local_service:
         raise ValueError("Local storage and service confirmation required")
     job, _, _ = local.load_job(library, job_id, confirm_local_storage=True)
@@ -57,6 +57,8 @@ def generate_spec(library: Path, job_id: str, merge_id: str, model: str, *, conf
         binding = {"schema_version": "1.0", "kind": "local_spec_candidate", "merge_sha256": merge_id,
                    "catalog_sha256": fingerprint(catalog), "model_identity": identity,
                    "prompt_sha256": fingerprint(messages), "base_url": provider.base_url, "attempt_limit": 1}
+        from local_retry import bind_retry
+        binding = bind_retry(directory / "specs", binding, retry_of, b"local spec candidate in progress\n")
         run_id = fingerprint(binding)
         output = local.plain_path(directory / "specs" / run_id)
         output.mkdir(parents=True, exist_ok=False)
@@ -94,6 +96,7 @@ def main(argv=None):
     parser.add_argument("--merge", required=True)
     parser.add_argument("--model", required=True)
     parser.add_argument("--base-url", default="http://127.0.0.1:11434")
+    parser.add_argument("--retry-of", help="Explicitly retry one known failed spec run into a new attempt")
     parser.add_argument("--confirm-local-storage", action="store_true")
     parser.add_argument("--confirm-local-service", action="store_true")
     args = parser.parse_args(argv)
@@ -102,7 +105,7 @@ def main(argv=None):
             raise ValueError("Requires the owner's local terminal")
         print(json.dumps(generate_spec(args.library, args.job, args.merge, args.model, base_url=args.base_url,
                                        confirm_local_storage=args.confirm_local_storage,
-                                       confirm_local_service=args.confirm_local_service)))
+                                       confirm_local_service=args.confirm_local_service, retry_of=args.retry_of)))
         return 0
     except (ValueError, OSError, RecursionError):
         print(json.dumps({"ok": False, "error": "Local spec generation failed; inspect local setup and documentation"}), file=sys.stderr)

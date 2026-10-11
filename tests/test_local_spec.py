@@ -112,6 +112,22 @@ class LocalSpecTests(unittest.TestCase):
                                         "--model", "fixture"]), 1)
             generate.assert_not_called()
 
+    def test_explicit_spec_retry_preserves_failure_and_verifies(self):
+        import spec_review
+        provider = self.setup_spec()
+        good = provider.complete.return_value
+        provider.complete.return_value = {"content": "invalid"}
+        with self.assertRaises(ValueError):
+            self.generate()
+        failed = next((self.library / self.job["job"]["id"] / "specs").iterdir())
+        before = {p.name: p.read_bytes() for p in failed.iterdir()}
+        provider.complete.return_value = good
+        result = spec.generate_spec(self.library, self.job["job"]["id"], self.merge_id, "fixture",
+                                    confirm_local_storage=True, confirm_local_service=True, retry_of=failed.name)
+        spec_review.read_spec(self.library, self.job["job"]["id"], result["spec_sha256"], confirm_local_storage=True)
+        self.assertEqual({p.name: p.read_bytes() for p in failed.iterdir()}, before)
+        self.assertEqual(provider.complete.call_count, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -161,6 +161,43 @@ class LocalCandidateTests(unittest.TestCase):
         generate.assert_not_called()
         self.assertNotIn(str(self.library), err.getvalue())
 
+    def test_explicit_retry_preserves_failure_and_success_is_readable(self):
+        import candidate_review
+        self.ready()
+        provider = self.provider()
+        good = provider.complete.return_value
+        provider.complete.return_value = {"content": "not json"}
+        with self.assertRaises(ValueError):
+            self.run_generation()
+        failed = next((self.library / self.job["job"]["id"] / "candidates").iterdir())
+        before = {p.name: p.read_bytes() for p in failed.iterdir()}
+        provider.complete.return_value = good
+        result = self.run_generation(retry_of=failed.name)
+        self.assertNotEqual(result["run_sha256"], failed.name)
+        candidate_review.read_run(self.library, self.job["job"]["id"], result["run_sha256"], confirm_local_storage=True)
+        self.assertEqual({p.name: p.read_bytes() for p in failed.iterdir()}, before)
+        self.assertEqual(provider.complete.call_count, 2)
+        with self.assertRaises(FileExistsError):
+            self.run_generation(retry_of=failed.name)
+        with self.assertRaises(OSError):
+            self.run_generation(retry_of=result["run_sha256"])
+        self.assertEqual(provider.complete.call_count, 2)
+
+    def test_retry_rejects_changed_binding_or_source_before_inference(self):
+        self.ready()
+        provider = self.provider()
+        provider.complete.return_value = {"content": "invalid"}
+        with self.assertRaises(ValueError):
+            self.run_generation()
+        failed = next((self.library / self.job["job"]["id"] / "candidates").iterdir())
+        provider.inspect_identity.return_value["digest"] = "c" * 64
+        with self.assertRaisesRegex(ValueError, "changed"):
+            self.run_generation(retry_of=failed.name)
+        (self.incoming / "source.txt").unlink()
+        with self.assertRaises(ValueError):
+            self.run_generation(retry_of=failed.name)
+        self.assertEqual(provider.complete.call_count, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

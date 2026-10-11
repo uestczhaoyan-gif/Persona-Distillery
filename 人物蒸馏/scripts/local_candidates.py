@@ -57,7 +57,7 @@ def checked_snapshot(library: Path, job_id: str, expected: dict | None = None):
 
 
 def generate(library: Path, job_id: str, model: str, *, confirm_local_storage: bool = False,
-             confirm_local_service: bool = False, base_url: str = "http://127.0.0.1:11434") -> dict:
+             confirm_local_service: bool = False, base_url: str = "http://127.0.0.1:11434", retry_of=None) -> dict:
     if not confirm_local_storage or not confirm_local_service:
         raise ValueError("Local storage and service confirmation required")
     # Policy and external location checks precede any input material or service access.
@@ -89,6 +89,8 @@ def generate(library: Path, job_id: str, model: str, *, confirm_local_storage: b
                    "snapshot_sha256": state["snapshot_sha256"], "input_fingerprint": state["input_fingerprint"],
                    "model_identity": identity, "prompt_sha256": fingerprint(messages),
                    "base_url": provider.base_url, "attempt_limit": 1}
+        from local_retry import bind_retry
+        binding = bind_retry(directory / "candidates", binding, retry_of, b"local candidate extraction in progress\n")
         run_id = fingerprint(binding)
         output = local.plain_path(directory / "candidates" / run_id)
         # One attempt for this input/model/prompt; preserve failures instead of silently retrying.
@@ -125,6 +127,7 @@ def main(argv=None):
     parser.add_argument("--job", required=True)
     parser.add_argument("--model", required=True)
     parser.add_argument("--base-url", default="http://127.0.0.1:11434")
+    parser.add_argument("--retry-of", help="Explicitly retry one known failed run into a new immutable attempt")
     parser.add_argument("--confirm-local-storage", action="store_true")
     parser.add_argument("--confirm-local-service", action="store_true")
     args = parser.parse_args(argv)
@@ -133,7 +136,7 @@ def main(argv=None):
             raise ValueError("Private extraction requires the owner's local terminal")
         print(json.dumps(generate(args.library, args.job, args.model, base_url=args.base_url,
                                   confirm_local_storage=args.confirm_local_storage,
-                                  confirm_local_service=args.confirm_local_service)))
+                                  confirm_local_service=args.confirm_local_service, retry_of=args.retry_of)))
         return 0
     except (ValueError, OSError, RecursionError):
         print(json.dumps({"ok": False, "error": "Local extraction failed; inspect local setup and documentation"}), file=sys.stderr)
