@@ -89,6 +89,66 @@ class LocalReviewTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             cli.candidate_review.prepare_review(current["bundle"], current["chunks"], current["policy"], value)
 
+    def test_full_synthetic_terminal_chain_to_preview_and_withdrawal(self):
+        import local_candidates
+        import local_spec
+        import local_package
+        self.ready()
+        provider = self.provider()
+        def response(messages, tools):
+            chunk = json.loads(messages[1]["content"])["chunks"][0]
+            return {"content": json.dumps({"evidence": [{"card_type": "synthesis", "claim": "Original synthetic tendency",
+                "evidence_summary": "Original fixture", "interpretation": "Tentative", "limitations": "Synthetic only",
+                "chunk_ids": [chunk["chunk_id"]], "topics": [], "confidence": "low"}], "memories": [], "gaps": []})}
+        provider.complete.side_effect = response
+        def model_command(main, args):
+            output, error = Terminal(), Terminal()
+            with patch.object(cli.sys, "stdin", Terminal()), patch.object(cli.sys, "stdout", output), patch.object(cli.sys, "stderr", error):
+                code = main(["--library", str(self.library), "--job", self.job["job"]["id"],
+                             "--model", "fixture", "--confirm-local-storage", "--confirm-local-service"] + args)
+            self.assertEqual(code, 0, error.getvalue())
+            return json.loads(output.getvalue())
+        def command(*args):
+            code, output, error = self.run_cli(*args)
+            self.assertEqual(code, 0, error)
+            return json.loads(output)
+        run_id = model_command(local_candidates.main, [])["run_sha256"]
+        decision = command("template-candidate", "--run", run_id)
+        decision.update(reviewer="Synthetic reviewer", note="Fixture only")
+        for item in decision["decisions"]:
+            item.update(action="accept", reason="Synthetic acceptance")
+        path = self.base / "decision-candidate.json"
+        path.write_text(json.dumps(decision), encoding="utf-8")
+        review_id = command("review-candidate", "--run", run_id, "--decision", str(path))["review_sha256"]
+        merge_id = command("merge", "--review", review_id)["merge_sha256"]
+        constructor = patch.object(local_spec, "OllamaProvider").start()
+        self.addCleanup(patch.stopall)
+        spec_provider = constructor.return_value
+        spec_provider.base_url = "http://127.0.0.1:11434"
+        spec_provider.inspect_identity.return_value = {"model": "fixture", "digest": "b" * 64, "options": {}}
+        spec_provider.last_metrics = {"done_reason": "stop"}
+        spec_provider.complete.return_value = {"content": json.dumps({
+            "profile": {"description": "Original fictional profile", "limitations": "Fixture only", "record_ids": ["E-0001"]},
+            "attention": [], "judgment": [], "dialogue_style": [], "knowledge_limits": [],
+            "language": {"mode": "undetermined", "adjustment": "Need more material", "record_ids": ["E-0001"]},
+            "anchors": [], "examples": [], "gaps": ["Synthetic integration only"]})}
+        spec_id = model_command(local_spec.main, ["--merge", merge_id])["spec_sha256"]
+        decision = command("template-spec", "--spec", spec_id)
+        decision.update(action="accept", reviewer="Synthetic reviewer", note="Fixture only")
+        path = self.base / "decision-spec.json"
+        path.write_text(json.dumps(decision), encoding="utf-8")
+        review_id = command("review-spec", "--spec", spec_id, "--decision", str(path))["review_sha256"]
+        result = command("build-draft", "--review", review_id)
+        package = self.base / "personas-output" / result["build_sha256"] / self.job["subject"]["person_id"]
+        context = local_package.load_local_context(package, confirm_local_storage=True, preview=True)
+        self.assertIn("Original fictional profile", context.context)
+        self.assertEqual(provider.complete.call_count, 1)
+        self.assertEqual(spec_provider.complete.call_count, 1)
+        self.assertFalse(result["persona_generated"])
+        (self.incoming / "source.txt").unlink()
+        with self.assertRaises(ValueError):
+            local_package.load_local_context(package, confirm_local_storage=True, preview=True)
+
 
 if __name__ == "__main__":
     unittest.main()
