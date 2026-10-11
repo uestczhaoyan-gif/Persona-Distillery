@@ -285,7 +285,7 @@ def build(library: Path, job_id: str, *, confirm_local_storage: bool,
         seen = set()
         for entry in entries:
             path = plain_path(Path(paths["incoming"]) / entry["path"]) if entry["status"] != "unsafe_path" else None
-            if entry["status"] != "pending" or path.suffix.casefold() not in {".txt", ".md"}:
+            if entry["status"] != "pending" or path.suffix.casefold() not in {".txt", ".md", ".html", ".htm"}:
                 quarantined.append({"file_id": entry["file_id"], "reason": entry["status"] if entry["status"] != "pending" else "unsupported_format"})
                 continue
             try:
@@ -293,7 +293,11 @@ def build(library: Path, job_id: str, *, confirm_local_storage: bool,
                     payload = handle.read(MAX_INPUT_BYTES + 1)
                 if len(payload) > MAX_INPUT_BYTES or digest(payload) != entry["sha256"]:
                     return pause("input_changed_during_build")
-                text = normalize(payload.decode("utf-8-sig"))
+                if path.suffix.casefold() in {".html", ".htm"}:
+                    from local_html import extract_html
+                    text = normalize(extract_html(payload))
+                else:
+                    text = normalize(payload.decode("utf-8-sig"))
                 if not text:
                     raise ValueError("empty_text")
             except (UnicodeError, ValueError):
