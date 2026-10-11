@@ -1,0 +1,2 @@
+# Optional offline PDF extraction; install locally before using PDF inputs.
+pypdf>=6.14.2,<7
