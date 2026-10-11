@@ -8,6 +8,7 @@ import sys
 
 import roundtable as rt
 from ollama_provider import OllamaProvider
+from persona_memory import tokens
 
 FIELDS = {"text", "responds_to", "stance", "claims", "questions", "needs_fact_check"}
 PROMPT = """Participate in a persona-perspective simulated roundtable. This is not a historical conversation.
@@ -19,7 +20,43 @@ Only one speaker speaks. Return JSON with exactly: text, responds_to (existing t
 stance (opening/support/challenge/clarify/revise/synthesize/defer), claims (0-8 objects containing text, novelty
 new/reframed/repeated/withdrawn, optionally responds_to_claim_id), questions (strings), needs_fact_check (boolean).
 No tools, Markdown fences, identity fields, source IDs or approval fields. Text is the natural spoken contribution;
-metadata is separate. The runtime labels this initial method-only preview as simulation, not sourced factual testimony."""
+metadata is separate. You may additionally return evidence_ids referencing only the supplied evidence cards.
+Use an empty list when no card supports the contribution. Cards are interpretations with limits, not quotations;
+citing a card does not prove a new modern factual claim. The runtime marks the contribution as simulation/inference."""
+
+
+def retrieve_evidence(package, manifest, query):
+    path = rt.checked_file(package, manifest["files"]["structured_evidence"])
+    with path.open("rb") as handle:
+        data = handle.read(2 * 1024 * 1024 + 1)
+    if len(data) > 2 * 1024 * 1024:
+        raise ValueError("Evidence inventory exceeds capacity")
+    terms = set(tokens(query))
+    ranked, ids = [], set()
+    for line in data.decode("utf-8").splitlines():
+        if not line.strip():
+            continue
+        record = json.loads(line)
+        eid = record["evidence_id"]
+        if eid in ids:
+            raise ValueError("Duplicate evidence ID")
+        ids.add(eid)
+        if record.get("status") != "reviewed" or record.get("delivery_channel") == "local_only":
+            continue
+        summary = {key: record[key] for key in ("evidence_id", "claim", "evidence_summary", "interpretation", "limitations", "source_refs", "topics")}
+        score = len(terms & set(tokens(json.dumps(summary, ensure_ascii=False))))
+        if score:
+            ranked.append((-score, eid, summary))
+    selected, used = [], 0
+    for _, _, record in sorted(ranked, key=lambda row: (row[0], row[1])):
+        size = len(json.dumps(record, ensure_ascii=False).encode("utf-8"))
+        if used + size > 20000:
+            continue
+        selected.append(record)
+        used += size
+        if len(selected) == 6:
+            break
+    return selected
 
 
 def context(ticket, root):
@@ -45,9 +82,17 @@ def context(ticket, root):
         if adapter.stat().st_size > 20000:
             raise ValueError("Adapter exceeds limit")
         documents["roundtable_adapter"] = adapter.read_text(encoding="utf-8")
+        query = session["topic"] + " " + session["current"]["question"]
+        if bundle["turns"]:
+            query += " " + bundle["turns"][-1]["text"]
+        pending = session["current"]["pending_user_event_id"]
+        query += " " + " ".join(e["text"] for e in bundle["events"] if e["event_id"] == pending)
+        evidence = retrieve_evidence(package, manifest, query)
         value = {"topic": session["topic"], "goal": session["goal"], "question": session["current"]["question"],
                  "speaker_id": ticket["speaker_id"], "max_chars": session["limits"]["max_chars_per_turn"],
-                 "persona": documents, "turns": bundle["turns"], "user_events": bundle["events"],
+                 "persona": documents, "evidence": evidence,
+                 "retrieval": {"method": "lexical_overlap", "limit": 6, "exhaustive": False},
+                 "turns": bundle["turns"], "user_events": bundle["events"],
                  "pending_user_event_id": session["current"]["pending_user_event_id"]}
         content = json.dumps(value, ensure_ascii=False)
         if len(content.encode("utf-8")) > 100000:
@@ -56,21 +101,28 @@ def context(ticket, root):
     return [{"role": "system", "content": PROMPT}, {"role": "user", "content": content}]
 
 
-def normalize(ticket, response):
+def normalize(ticket, response, evidence=()):
     if (not isinstance(response, dict) or response.get("tool_calls") or not isinstance(response.get("content"), str)
             or len(response["content"]) > 30000):
         raise ValueError("Invalid model response")
     raw = json.loads(response["content"])
-    if not isinstance(raw, dict) or set(raw) != FIELDS or not isinstance(raw["claims"], list) or len(raw["claims"]) > 8:
+    if not isinstance(raw, dict) or set(raw) not in (FIELDS, FIELDS | {"evidence_ids"}) or not isinstance(raw["claims"], list) or len(raw["claims"]) > 8:
         raise ValueError("Invalid candidate fields")
     raw = copy.deepcopy(raw)
+    cited = raw.pop("evidence_ids", [])
+    available = {e["evidence_id"]: e for e in evidence}
+    if (not isinstance(cited, list) or any(not isinstance(eid, str) or eid not in available for eid in cited)
+            or len(set(cited)) != len(cited)):
+        raise ValueError("Evidence citation was not loaded for this speaker")
+    sources = sorted({ref["source_id"] for eid in cited for ref in available[eid]["source_refs"]})
     for i, claim in enumerate(raw["claims"], 1):
         if not isinstance(claim, dict) or set(claim) not in ({"text", "novelty"}, {"text", "novelty", "responds_to_claim_id"}):
             raise ValueError("Invalid claim fields")
         claim["claim_id"] = f"C-{ticket['sequence'] * 100 + i:04d}"
     return {**raw, **{key: ticket[key] for key in ("session_id", "turn_id", "speaker_id", "sequence", "section_index")},
             "schema_version": "1.0", "created_at": rt.now(),
-            "basis": {"modes": ["simulation"], "evidence_ids": [], "source_ids": [], "fact_ids": []},
+            "basis": {"modes": ["simulation", "inference"] if cited else ["simulation"],
+                      "evidence_ids": cited, "source_ids": sources, "fact_ids": []},
             "moderation": {"accepted": True, "validation_notes": ["Structural validation only; semantic quality not independently reviewed"],
                            "stop_signal": "needs_fact_check" if raw["needs_fact_check"] else "none"}}
 
@@ -101,7 +153,7 @@ def generate_turn(session_id, model, *, root=rt.ROOT, speaker=None, confirm_loca
         response = provider.complete(messages, [])
         if provider.inspect_identity() != identity or provider.last_metrics.get("done_reason") == "length":
             raise ValueError("Model identity changed or response truncated")
-        turn = normalize(ticket, response)
+        turn = normalize(ticket, response, json.loads(messages[1]["content"])["evidence"])
         result = rt.commit_turn(ticket, turn, root)
         return {**result, "request_id": ticket["request_id"], "model_identity": identity,
                 "semantic_quality_verified": False}

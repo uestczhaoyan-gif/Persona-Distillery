@@ -100,6 +100,42 @@ class RoundtableRunnerTests(unittest.TestCase):
         self.assertIsNone(self.state()["session"]["active_generation"])
         self.model.complete.assert_not_called()
 
+    def test_loaded_evidence_citation_resolves_sources(self):
+        self.start()
+        self.provider()
+        def supported(messages, tools):
+            evidence = json.loads(messages[1]["content"])["evidence"]
+            self.assertTrue(evidence)
+            self.raw["evidence_ids"] = [evidence[0]["evidence_id"]]
+            return {"content": json.dumps(self.raw)}
+        self.model.complete.side_effect = supported
+        self.assertTrue(self.generate()["accepted"])
+        basis = self.state()["turns"][0]["basis"]
+        self.assertTrue(basis["source_ids"])
+        self.assertEqual(basis["modes"], ["simulation", "inference"])
+
+    def test_not_loaded_evidence_is_refused(self):
+        self.start()
+        self.provider()
+        self.raw["evidence_ids"] = ["E-9999"]
+        self.model.complete.return_value = {"content": json.dumps(self.raw)}
+        with self.assertRaises(ValueError):
+            self.generate()
+        self.assertEqual(self.state()["turns"], [])
+
+    def test_withdrawn_and_local_only_cards_never_retrieved(self):
+        package = self.root / "personas/kongzi"
+        manifest = fixtures.rt.read_json(package / "manifest.json")
+        path = package / manifest["files"]["structured_evidence"]
+        records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+        for i, record in enumerate(records):
+            if i % 2:
+                record["delivery_channel"] = "local_only"
+            else:
+                record["status"] = "withdrawn"
+        path.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in records), encoding="utf-8")
+        self.assertEqual(runner.retrieve_evidence(package, manifest, "学习 判断"), [])
+
 
 if __name__ == "__main__":
     unittest.main()
