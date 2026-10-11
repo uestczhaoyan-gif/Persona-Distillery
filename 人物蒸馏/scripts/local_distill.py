@@ -285,7 +285,7 @@ def build(library: Path, job_id: str, *, confirm_local_storage: bool,
         seen = set()
         for entry in entries:
             path = plain_path(Path(paths["incoming"]) / entry["path"]) if entry["status"] != "unsafe_path" else None
-            if entry["status"] != "pending" or path.suffix.casefold() not in {".txt", ".md", ".html", ".htm", ".docx"}:
+            if entry["status"] != "pending" or path.suffix.casefold() not in {".txt", ".md", ".html", ".htm", ".docx", ".pdf"}:
                 quarantined.append({"file_id": entry["file_id"], "reason": entry["status"] if entry["status"] != "pending" else "unsupported_format"})
                 continue
             try:
@@ -299,12 +299,20 @@ def build(library: Path, job_id: str, *, confirm_local_storage: bool,
                 elif path.suffix.casefold() == ".docx":
                     from local_docx import extract_docx
                     text = normalize(extract_docx(payload))
+                elif path.suffix.casefold() == ".pdf":
+                    from local_pdf import extract_pdf
+                    text = normalize(extract_pdf(payload))
                 else:
                     text = normalize(payload.decode("utf-8-sig"))
                 if not text:
                     raise ValueError("empty_text")
-            except (UnicodeError, ValueError):
-                quarantined.append({"file_id": entry["file_id"], "reason": "invalid_or_empty_text"})
+            except (UnicodeError, ValueError) as error:
+                reason = "invalid_or_empty_text"
+                if path.suffix.casefold() == ".pdf":
+                    from local_pdf import ERRORS
+                    if str(error) in ERRORS | {"pdf_input_limit", "pdf_invalid_header", "pdf_timeout", "pdf_worker_failed"}:
+                        reason = str(error)
+                quarantined.append({"file_id": entry["file_id"], "reason": reason})
                 continue
             checksum = digest(text.encode())
             if checksum in seen:
