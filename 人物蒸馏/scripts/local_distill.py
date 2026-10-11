@@ -285,7 +285,7 @@ def build(library: Path, job_id: str, *, confirm_local_storage: bool,
         seen = set()
         for entry in entries:
             path = plain_path(Path(paths["incoming"]) / entry["path"]) if entry["status"] != "unsafe_path" else None
-            if entry["status"] != "pending" or path.suffix.casefold() not in {".txt", ".md", ".html", ".htm"}:
+            if entry["status"] != "pending" or path.suffix.casefold() not in {".txt", ".md", ".html", ".htm", ".docx"}:
                 quarantined.append({"file_id": entry["file_id"], "reason": entry["status"] if entry["status"] != "pending" else "unsupported_format"})
                 continue
             try:
@@ -296,6 +296,9 @@ def build(library: Path, job_id: str, *, confirm_local_storage: bool,
                 if path.suffix.casefold() in {".html", ".htm"}:
                     from local_html import extract_html
                     text = normalize(extract_html(payload))
+                elif path.suffix.casefold() == ".docx":
+                    from local_docx import extract_docx
+                    text = normalize(extract_docx(payload))
                 else:
                     text = normalize(payload.decode("utf-8-sig"))
                 if not text:
