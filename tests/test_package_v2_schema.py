@@ -21,7 +21,11 @@ class PackageV2SchemaTests(unittest.TestCase):
     def test_local_draft_preserves_all_existing_package_roles(self):
         self.assertTrue(self.validator.is_valid(self.value))
         legacy = json.loads((ROOT / "人物蒸馏/schemas/persona-package.schema.json").read_text(encoding="utf-8"))
-        self.assertEqual(SCHEMA["properties"]["files"], legacy["properties"]["files"])
+        current_files = copy.deepcopy(SCHEMA["properties"]["files"])
+        self.assertEqual(current_files["properties"].pop("build_binding"), {"type": "string"})
+        self.assertEqual(current_files, legacy["properties"]["files"])
+        self.value["files"]["build_binding"] = "build-binding.json"
+        self.assertTrue(self.validator.is_valid(self.value))
         self.assertTrue(set(legacy["required"]).issubset(SCHEMA["required"]))
 
     def test_policy_fields_and_constraints_match_standalone_contract(self):

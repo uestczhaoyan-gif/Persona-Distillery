@@ -144,6 +144,9 @@
         "profile": {
           "type": "string"
         },
+        "build_binding": {
+          "type": "string"
+        },
         "character_card": {
           "type": "string"
         },

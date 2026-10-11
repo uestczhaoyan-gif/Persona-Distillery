@@ -107,12 +107,17 @@ def save_spec_review(library: Path, job_id: str, spec_id: str, decision: dict, *
                 "action": result["action"], "publication_approved": False, "persona_generated": False}
 
 
+def _read_spec_review_locked(library: Path, job_id: str, review_id: str):
+    directory = local.job_directory(library, job_id)
+    value = _read_stored(directory, review_id)
+    current = _read_spec_locked(library, job_id, value["spec_sha256"])
+    if prepare_decision(current, value["decision"]) != value["result"]:
+        raise ValueError("Spec review no longer validates")
+    return value
+
+
 def read_spec_review(library: Path, job_id: str, review_id: str, *, confirm_local_storage=False):
     local.load_job(library, job_id, confirm_local_storage=confirm_local_storage)
     directory = local.job_directory(library, job_id)
     with local.job_lock(directory):
-        value = _read_stored(directory, review_id)
-        current = _read_spec_locked(library, job_id, value["spec_sha256"])
-        if prepare_decision(current, value["decision"]) != value["result"]:
-            raise ValueError("Spec review no longer validates")
-        return value
+        return _read_spec_review_locked(library, job_id, review_id)

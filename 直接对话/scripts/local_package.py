@@ -39,6 +39,7 @@ def _complete_package(package: Path, workspace: Path) -> Path:
     for path in (package / ".migration-incomplete.json", package.parent / ".migration.lock",
                  package / ".backup-incomplete.json", package.parent / ".backup.lock",
                  package / ".deletion-incomplete.json", package.parent / ".deletion.lock",
+                 package / ".build-incomplete",
                  package / "manifest.json"):
         if path.exists() or path.is_symlink():
             raise ValueError("Incomplete, locked or legacy-aliased package cannot be loaded")
@@ -84,6 +85,12 @@ def load_local_context(package: Path, *, confirm_local_storage: bool,
         raise ValueError("Package directory does not match the stable identity")
     if not preview and (manifest["readiness"] == "draft" or not manifest["capabilities"]["direct_chat"]):
         raise ValueError("Explicit builder preview is required for this package")
+    build_hash = None
+    if "build_binding" in manifest["files"]:
+        from local_draft import verify_draft
+        build_hash = verify_draft(package)
+    elif (package / "build-binding.json").exists():
+        raise ValueError("Generated draft cannot omit its source binding")
 
     # Validate every declared path before opening any body, including files not
     # used as dialogue memory. Logs, examples of usage and raw inputs stay out.
@@ -94,6 +101,8 @@ def load_local_context(package: Path, *, confirm_local_storage: bool,
     if len({str(path).casefold() for _, path in selected}) != len(selected):
         raise ValueError("Context roles must refer to distinct files")
     sections, hashes = [], []
+    if build_hash is not None:
+        hashes.append((manifest["files"]["build_binding"], build_hash))
     remaining = max_chars
     for role, path in selected:
         # UTF-8 uses at most four bytes per code point, plus an optional BOM.
@@ -118,6 +127,8 @@ def load_local_context(package: Path, *, confirm_local_storage: bool,
         data = _bounded_bytes(package_file(package, relative), max_chars * 4 + 3)
         if hashlib.sha256(data).hexdigest() != digest:
             raise ValueError("Context changed during loading; retry after local review")
+    if build_hash is not None and verify_draft(package) != build_hash:
+        raise ValueError("Draft binding changed during loading")
     return LocalContext(manifest["person_id"], "\n\n".join(sections),
                         json.dumps(policy, ensure_ascii=False, sort_keys=True),
                         hashlib.sha256(header).hexdigest(), tuple(hashes))
