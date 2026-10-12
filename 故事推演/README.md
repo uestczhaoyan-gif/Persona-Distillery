@@ -66,6 +66,22 @@ flowchart LR
 
 ## 最小版本
 
+### 已实现：本地状态与分支（M7.1）
+
+```powershell
+python 故事推演/scripts/story.py create --config 故事推演/_template/scenario.example.json --preview
+python 故事推演/scripts/story.py status --session <ST会话编号>
+python 故事推演/scripts/story.py actor --session <ST会话编号>
+```
+
+目前只支持历史公共人物的显式草稿预览，不改变人物能力或发布状态。配置中的 premise/rules/goal 是主角已知设定；保密的虚构世界事实放 facts 且 known=false，不要写进主角已知设定。
+
+状态工具提供 propose → choose → effect 三个操作，每个变更须传当前 `--version`，选择时传从零开始的 `--index`，提案和后果通过 `--payload` JSON 文件导入。提案含 situation 与 2—4 个 options，每项含 label/reason/cost/tradeoff；cost 为资源名到非负整数的映射，至少一项为正且不能超支。后果含 observation/cause/resource_delta/reveal/new_facts，观察供人物读取，因果内部说明不进入人物上下文。新事实含 text 和 known，编号由程序生成。
+
+每次选择先扣除代价，再单独提交后果；三次后果后进入 ended。pause/resume 使旧版本请求失效；fork --snapshot <先前操作返回的快照哈希> 可从选择之前的 ready/choosing 状态分出新路径。分支资源、知识和历史来自该快照，不继承主线后来的结果。所有会话保存在忽略目录 sessions/，不提交生成内容。
+
+当前尚无故事模型运行器、自动成文或故事界面。6 项原创合成场景测试通过，覆盖成本、三次结局、信息隔离、分支恢复、暂停迟到拒收和损坏快照。人物效果及真实因果合理性仍待验。
+
 先做一个人物、一条主线、3 个决策节点和一个结局。每个节点都先保存状态，再由用户点击继续。确认选择—后果链有说服力后，再加入分支树、可视化时间线、多人物共同决策和不同结局的比较。
 
 人物选择器只加载 `manifest.json` 中达到 `simulation-ready` 或 `publish-ready`，且 `capabilities.story_simulation` 为 `true` 的人物。故事比普通聊天需要更多真实决策案例和反例，因此不能只凭人物卡或语言风格开启该能力。
