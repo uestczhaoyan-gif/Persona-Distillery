@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="local-token" content="__LOCAL_TOKEN__"><title>人物视角 · 圆桌工作台</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body>
+<header><div><span class="eyebrow">PERSONA DISTILLERY</span><h1>让不同的视角，相遇。</h1><p>圆桌工作台 <span class="badge">仅本机运行</span></p></div><p class="notice">AI 人物视角模拟<br>不是历史记录或真实发言</p></header>
+<main>
+<aside>
+<section class="card"><h2>准备一场圆桌</h2><form id="create-form">
+<label for="topic">想讨论什么？</label><textarea id="topic" required maxlength="2000" rows="3" placeholder="例如：我们怎样在信息过载时形成自己的判断？"></textarea>
+<label for="goal">希望讨论带来什么？</label><input id="goal" required maxlength="2000" value="比较不同判断路径，保留分歧，找到下一步可尝试的行动。">
+<fieldset><legend>邀请人物 · 至少两位</legend><div id="personas"></div></fieldset>
+<div class="row"><label for="turn-limit">最多发言回合</label><input id="turn-limit" type="number" min="2" max="24" value="6"></div>
+<label class="check"><input id="preview" type="checkbox">我同意预览历史公共人物草稿，理解其材料和效果尚未验收。</label>
+<button type="submit" class="primary">创建圆桌</button></form></section>
+<section class="card"><h2>本机模型</h2><label for="model">已安装的 Ollama 模型名</label><input id="model" placeholder="填写本机已有模型名" autocomplete="off"><label class="check"><input id="local-confirm" type="checkbox">确认使用本机 Ollama 服务</label><p class="hint">请先在本机启动模型。这里不会下载模型；每次“继续”只生成一个回合。</p></section>
+<section class="card"><div class="section-head"><h2>最近的圆桌</h2><button id="refresh-list" class="quiet" type="button">刷新</button></div><div id="sessions" class="session-list"></div></section>
+</aside>
+<div class="workspace">
+<section class="card discussion"><div class="section-head"><div><span class="eyebrow">THE CONVERSATION</span><h2 id="session-title">从一个值得讨论的问题开始</h2></div><span id="status" class="badge">尚未创建</span></div>
+<p id="progress" class="hint">邀请两到三位人物，听见不同的思考方式。</p>
+<div id="alert" role="status" aria-live="polite"></div>
+<div class="toolbar"><button id="next" class="primary" disabled>开始讨论</button><button id="pause" disabled>暂停</button><button id="finish" disabled>结束讨论</button><button id="edit" disabled>生成讨论稿</button></div>
+<div id="turns" class="turns"><div class="empty"><span>○ ○ ○</span><h3>这里将呈现实际发言</h3><p>你可以随时插话、改变问题，或让讨论停在尚未解决的分歧上。</p></div></div>
+<form id="interject-form" class="interject"><label for="interjection">加入你的问题</label><div class="row"><input id="interjection" maxlength="10000" placeholder="追问一个观点，或换一个角度……"><button id="interject" type="submit" disabled>插话并暂停</button></div></form>
+</section>
+<section class="card"><div class="section-head"><div><span class="eyebrow">AFTER THE CONVERSATION</span><h2>讨论留下什么</h2></div><span class="badge">保存在本机</span></div><p class="hint">逐轮记录保留发生过的讨论；讨论稿整理脉络；依据附录回链到实际回合。模型归纳仍需人工核查。</p><div id="artifacts" class="toolbar"></div><pre id="artifact-preview" tabindex="0">结束讨论并成稿后，可在这里阅读与下载。</pre></section>
+</div>
+</main><footer>当前接入圆桌；演讲与故事工作流将继续完善。人物发布状态不会因预览而改变。</footer>
+</body></html>
