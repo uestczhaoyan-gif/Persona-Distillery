@@ -15,6 +15,8 @@ from urllib.parse import urlsplit
 import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from lecture_api import Lectures
 sys.path.insert(0, str(ROOT / "圆桌会议/scripts"))
 import roundtable as rt
 from roundtable_runner import generate_turn
@@ -27,6 +29,7 @@ class Application:
         self.token = secrets.token_urlsafe(32)
         self.jobs = {}
         self.guard = threading.Lock()
+        self.lectures = Lectures(self.root)
 
     def library(self):
         template = rt.read_json(self.root / "圆桌会议/_template/session.example.json")
@@ -169,12 +172,22 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(200, {"personas": app.library()})
             if path == "/api/sessions":
                 return self.respond(200, {"sessions": app.sessions()})
+            if path == "/api/lecture-library":
+                return self.respond(200, {"personas": app.lectures.library()})
+            if path == "/api/lectures":
+                return self.respond(200, {"sessions": app.lectures.sessions()})
             parts = path.strip("/").split("/")
+            if len(parts) == 3 and parts[:2] == ["api", "lectures"]:
+                return self.respond(200, app.lectures.view(parts[2]))
+            if len(parts) == 4 and parts[:2] == ["api", "lecture-artifacts"]:
+                return self.respond(200, {"content": app.lectures.artifact(parts[2], parts[3])})
             if len(parts) == 3 and parts[:2] == ["api", "sessions"]:
                 return self.respond(200, app.view(parts[2]))
             if len(parts) == 4 and parts[:2] == ["api", "artifacts"]:
                 return self.respond(200, {"content": app.artifact(parts[2], parts[3])})
             static = {"/": ("index.html", "text/html; charset=utf-8"),
+                      "/lecture": ("lecture.html", "text/html; charset=utf-8"),
+                      "/lecture.js": ("lecture.js", "text/javascript; charset=utf-8"),
                       "/app.js": ("app.js", "text/javascript; charset=utf-8"),
                       "/style.css": ("style.css", "text/css; charset=utf-8")}
             if path in static:
@@ -198,6 +211,10 @@ class Handler(BaseHTTPRequestHandler):
             parts = urlsplit(self.path).path.strip("/").split("/")
             if parts == ["api", "sessions"]:
                 return self.respond(201, self.server.app.create(data))
+            if parts == ["api", "lectures"]:
+                return self.respond(201, self.server.app.lectures.create(data))
+            if len(parts) == 4 and parts[:2] == ["api", "lectures"]:
+                return self.respond(200, self.server.app.lectures.action(parts[2], parts[3], data))
             if len(parts) == 4 and parts[:2] == ["api", "sessions"]:
                 return self.respond(200, self.server.app.action(parts[2], parts[3], data))
             return self.respond(404, {"error": "操作不存在。"})
