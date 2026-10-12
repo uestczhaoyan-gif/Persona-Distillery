@@ -94,6 +94,22 @@ def check_pins(state, root):
     store.check_pins({"pins": {state["person_id"]: state["pins"]}}, Path(root))
 
 
+def check_basis(state, basis, root):
+    if not isinstance(basis, dict) or set(basis) != {"evidence_ids", "source_ids", "modes"}:
+        raise ValueError("Invalid story basis")
+    package = Path(root) / "personas" / state["person_id"]
+    manifest = store.read_json(store.checked_file(package, "manifest.json"))
+    file = store.checked_file(package, manifest["files"]["structured_evidence"])
+    rows = [json.loads(line) for line in file.read_text(encoding="utf-8").splitlines() if line.strip()]
+    evidence = {row["evidence_id"]: row for row in rows if row.get("status") == "reviewed" and row.get("delivery_channel") != "local_only"}
+    refs = basis["evidence_ids"]
+    if not isinstance(refs, list) or any(not isinstance(i, str) or i not in evidence for i in refs) or len(set(refs)) != len(refs):
+        raise ValueError("Invalid story evidence")
+    sources = sorted({ref["source_id"] for eid in refs for ref in evidence[eid]["source_refs"]})
+    if basis["source_ids"] != sources or basis["modes"] != (["simulation", "inference"] if refs else ["simulation"]):
+        raise ValueError("Unsupported story basis")
+
+
 def create(config, *, root=ROOT, preview=False):
     root = Path(root).resolve()
     if not isinstance(config, dict) or set(config) != {"person_id", "title", "premise", "rules", "goal", "facts", "resources"}:
@@ -146,7 +162,7 @@ def actor_view(state):
                        for h in state["history"]]}
 
 
-def mutate(identifier, branch, version, operation, payload, *, root=ROOT):
+def mutate(identifier, branch, version, operation, payload, *, root=ROOT, generation=None):
     path = directory(identifier, root)
     with store.locked(path):
         state = load(identifier, branch, root)
@@ -166,8 +182,11 @@ def mutate(identifier, branch, version, operation, payload, *, root=ROOT):
             if not isinstance(options, list) or not 2 <= len(options) <= 4:
                 raise ValueError("Provide two to four choices")
             for option in options:
-                if not isinstance(option, dict) or set(option) != {"label", "reason", "cost", "tradeoff"}:
+                fields = {"label", "reason", "cost", "tradeoff"}
+                if not isinstance(option, dict) or set(option) not in (fields, fields | {"basis"}):
                     raise ValueError("Invalid choice")
+                if "basis" in option:
+                    check_basis(state, option["basis"], root)
                 for key in ("label", "reason", "tradeoff"):
                     text(option[key])
                 resource_map(option["cost"])
@@ -217,6 +236,8 @@ def mutate(identifier, branch, version, operation, payload, *, root=ROOT):
         else:
             raise ValueError("Operation unavailable in this story state")
         state["version"] += 1
+        if generation is not None:
+            state.setdefault("generations", []).append({"version": state["version"], **copy.deepcopy(generation)})
         return commit(path, state)
 
 
