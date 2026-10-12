@@ -84,6 +84,20 @@ flowchart LR
 
 ## Agent 直读方式（现在可用）
 
+### 已实现：准备演讲输入与独立事实简报
+
+M6.1a 提供实际入口，先复制并修改 `_template/brief.example.json` 中的主题、听众、目标、时长和研究日期，再运行：
+
+```powershell
+python 定题演讲/scripts/prepare_lecture.py --config <修改后的配置文件> --preview
+```
+
+仅支持历史公共人物；`--preview` 明确授权已有草稿预览，不改变人物能力或发布状态。
+准备结果保存在本机 `sessions/SP-.../` 的 `input.json`、`00-brief.md` 和 `01-research.md`。
+`facts` 可为空；非空时每项包含唯一 `fact_id`（如 F-0001）、`statement`、`source_title`、`source_url`、`checked_on` 和 `limitations`。提供来源不等于程序已独立核实；简报明确记录这一状态，不写入人物记忆。
+
+当前入口不联网、不调用模型，不生成提纲或正文；人物主题覆盖与口读时长未验收。下一节点接人物提纲与模型运行，随后成稿、修订和工作台。4 项原创夹具测试通过，无实际私人数据蒸馏。
+
 在仓库根目录新建对话，发送：
 
 ```text
