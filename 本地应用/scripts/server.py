@@ -17,6 +17,7 @@ import uuid
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lecture_api import Lectures
+from story_api import Stories
 sys.path.insert(0, str(ROOT / "圆桌会议/scripts"))
 import roundtable as rt
 from roundtable_runner import generate_turn
@@ -30,6 +31,7 @@ class Application:
         self.jobs = {}
         self.guard = threading.Lock()
         self.lectures = Lectures(self.root)
+        self.stories = Stories(self.root)
 
     def library(self):
         template = rt.read_json(self.root / "圆桌会议/_template/session.example.json")
@@ -168,6 +170,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond(403, {"error": "仅允许本机工作台访问。"})
         try:
             app = self.server.app
+            if path == "/api/story-library":
+                return self.respond(200, {"personas": app.stories.library()})
+            if path == "/api/stories":
+                return self.respond(200, {"sessions": app.stories.sessions()})
             if path == "/api/library":
                 return self.respond(200, {"personas": app.library()})
             if path == "/api/sessions":
@@ -177,6 +183,12 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/lectures":
                 return self.respond(200, {"sessions": app.lectures.sessions()})
             parts = path.strip("/").split("/")
+            if len(parts) == 3 and parts[:2] == ["api", "story-branches"]:
+                return self.respond(200, app.stories.branches(parts[2]))
+            if len(parts) == 4 and parts[:2] == ["api", "stories"]:
+                return self.respond(200, app.stories.view(parts[2], parts[3]))
+            if len(parts) == 5 and parts[:2] == ["api", "story-artifacts"]:
+                return self.respond(200, {"content": app.stories.artifact(parts[2], parts[3], parts[4])})
             if len(parts) == 3 and parts[:2] == ["api", "lectures"]:
                 return self.respond(200, app.lectures.view(parts[2]))
             if len(parts) == 4 and parts[:2] == ["api", "lecture-artifacts"]:
@@ -211,6 +223,10 @@ class Handler(BaseHTTPRequestHandler):
             parts = urlsplit(self.path).path.strip("/").split("/")
             if parts == ["api", "sessions"]:
                 return self.respond(201, self.server.app.create(data))
+            if parts == ["api", "stories"]:
+                return self.respond(201, self.server.app.stories.create(data))
+            if len(parts) == 5 and parts[:2] == ["api", "stories"]:
+                return self.respond(200, self.server.app.stories.action(parts[2], parts[3], parts[4], data))
             if parts == ["api", "lectures"]:
                 return self.respond(201, self.server.app.lectures.create(data))
             if len(parts) == 4 and parts[:2] == ["api", "lectures"]:
