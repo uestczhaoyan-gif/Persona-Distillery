@@ -136,6 +136,21 @@ class LocalAppTests(unittest.TestCase):
                 release.set()
             self.wait_job()
 
+    def test_poll_does_not_pair_stale_snapshot_with_new_job_completion(self):
+        self.create()
+        application = self.server.app
+        application.jobs[self.sid] = {"status": "running"}
+        original = app.rt.load
+        def completing(path, root):
+            bundle = original(path, root)
+            with application.guard:
+                application.jobs[self.sid]["status"] = "done"
+            return bundle
+        with patch.object(app.rt, "load", side_effect=completing):
+            result = application.view(self.sid)
+        self.assertEqual(result["job"]["status"], "running")
+        self.assertEqual(application.view(self.sid)["job"]["status"], "done")
+
 
 if __name__ == "__main__":
     unittest.main()

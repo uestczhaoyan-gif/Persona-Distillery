@@ -70,10 +70,12 @@ class Application:
 
     def view(self, identifier):
         path = rt.directory(identifier, self.root)
-        # The pointer selects an immutable snapshot. Reads need not contend with commits.
-        bundle = rt.load(path, self.root)
+        # Read job first: a reported completion must precede the snapshot read.
+        # The reverse order can pair an older snapshot with a newly completed job.
         with self.guard:
             job = copy.deepcopy(self.jobs.get(identifier))
+        # The pointer selects an immutable snapshot. Reads need not contend with commits.
+        bundle = rt.load(path, self.root)
         return {k: bundle[k] for k in ("session", "turns", "events", "article")} | {"job": job}
 
     def sessions(self):
