@@ -20,6 +20,7 @@ from lecture_api import Lectures
 from story_api import Stories
 from overview import overview
 from chat_api import Chats
+from model_status import model_status
 sys.path.insert(0, str(ROOT / "圆桌会议/scripts"))
 import roundtable as rt
 from roundtable_runner import generate_turn
@@ -173,6 +174,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond(403, {"error": "仅允许本机工作台访问。"})
         try:
             app = self.server.app
+            if path == "/api/model-status":
+                return self.respond(200, model_status())
             if path == "/api/overview":
                 return self.respond(200, overview(app))
             if path == "/api/story-library":
@@ -204,7 +207,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(200, app.view(parts[2]))
             if len(parts) == 4 and parts[:2] == ["api", "artifacts"]:
                 return self.respond(200, {"content": app.artifact(parts[2], parts[3])})
-            static = {"/chat": ("chat.html", "text/html; charset=utf-8"),
+            static = {"/model-status.js": ("model-status.js", "text/javascript; charset=utf-8"),
+                      "/chat": ("chat.html", "text/html; charset=utf-8"),
                       "/chat.js": ("chat.js", "text/javascript; charset=utf-8"),
                       "/home": ("home.html", "text/html; charset=utf-8"),
                       "/home.js": ("home.js", "text/javascript; charset=utf-8"),
