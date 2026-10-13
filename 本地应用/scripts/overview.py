@@ -17,7 +17,7 @@ def overview(app):
                        'readiness':m['readiness'],'visibility':m['visibility'],
                        'topics':coverage.get('topics',[])[:6],
                        'period':coverage.get('period',''),
-                       'modes':{'roundtable':person in available,'lecture':True,'story':True},
+                       'modes':{'chat':m.get('capabilities',{}).get('direct_chat') is True,'roundtable':person in available,'lecture':True,'story':True},
                        'preview':m['visibility']!='public' or m['readiness']=='draft'})
     recent=[]
     for kind,route,values in [('roundtable','/',app.sessions()),('lecture','/lecture',app.lectures.sessions()),('story','/story',app.stories.sessions())]:

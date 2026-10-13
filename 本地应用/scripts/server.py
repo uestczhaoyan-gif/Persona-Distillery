@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lecture_api import Lectures
 from story_api import Stories
 from overview import overview
+from chat_api import Chats
 sys.path.insert(0, str(ROOT / "圆桌会议/scripts"))
 import roundtable as rt
 from roundtable_runner import generate_turn
@@ -33,6 +34,7 @@ class Application:
         self.guard = threading.Lock()
         self.lectures = Lectures(self.root)
         self.stories = Stories(self.root)
+        self.chats = Chats(self.root)
 
     def library(self):
         template = rt.read_json(self.root / "圆桌会议/_template/session.example.json")
@@ -192,6 +194,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(200, app.stories.view(parts[2], parts[3]))
             if len(parts) == 5 and parts[:2] == ["api", "story-artifacts"]:
                 return self.respond(200, {"content": app.stories.artifact(parts[2], parts[3], parts[4])})
+            if len(parts) == 3 and parts[:2] == ["api", "chats"]:
+                return self.respond(200, app.chats.view(parts[2]))
             if len(parts) == 3 and parts[:2] == ["api", "lectures"]:
                 return self.respond(200, app.lectures.view(parts[2]))
             if len(parts) == 4 and parts[:2] == ["api", "lecture-artifacts"]:
@@ -200,7 +204,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(200, app.view(parts[2]))
             if len(parts) == 4 and parts[:2] == ["api", "artifacts"]:
                 return self.respond(200, {"content": app.artifact(parts[2], parts[3])})
-            static = {"/home": ("home.html", "text/html; charset=utf-8"),
+            static = {"/chat": ("chat.html", "text/html; charset=utf-8"),
+                      "/chat.js": ("chat.js", "text/javascript; charset=utf-8"),
+                      "/home": ("home.html", "text/html; charset=utf-8"),
                       "/home.js": ("home.js", "text/javascript; charset=utf-8"),
                       "/": ("index.html", "text/html; charset=utf-8"),
                       "/lecture": ("lecture.html", "text/html; charset=utf-8"),
@@ -230,6 +236,10 @@ class Handler(BaseHTTPRequestHandler):
             parts = urlsplit(self.path).path.strip("/").split("/")
             if parts == ["api", "sessions"]:
                 return self.respond(201, self.server.app.create(data))
+            if parts == ["api", "chats"]:
+                return self.respond(201, self.server.app.chats.create(data))
+            if len(parts) == 4 and parts[:2] == ["api", "chats"]:
+                return self.respond(200, self.server.app.chats.action(parts[2], parts[3], data))
             if parts == ["api", "stories"]:
                 return self.respond(201, self.server.app.stories.create(data))
             if len(parts) == 5 and parts[:2] == ["api", "stories"]:
