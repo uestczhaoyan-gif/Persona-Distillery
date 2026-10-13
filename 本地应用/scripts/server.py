@@ -199,6 +199,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(200, {"content": app.artifact(parts[2], parts[3])})
             static = {"/": ("index.html", "text/html; charset=utf-8"),
                       "/lecture": ("lecture.html", "text/html; charset=utf-8"),
+                      "/story": ("story.html", "text/html; charset=utf-8"),
+                      "/story.js": ("story.js", "text/javascript; charset=utf-8"),
                       "/lecture.js": ("lecture.js", "text/javascript; charset=utf-8"),
                       "/app.js": ("app.js", "text/javascript; charset=utf-8"),
                       "/style.css": ("style.css", "text/css; charset=utf-8")}

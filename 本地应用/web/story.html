@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="local-token" content="__LOCAL_TOKEN__"><title>人物视角 · 故事工作台</title><link rel="stylesheet" href="/style.css"><script src="/story.js" defer></script></head>
+<body><header><div><span class="eyebrow">PERSONA DISTILLERY</span><h1>每一次选择，都留下另一条路。</h1><p>故事工作台 <span class="badge">仅本机运行</span></p></div><p class="notice">虚构思想实验<br>不是历史记录或人物真实经历</p></header>
+<nav class="mode-nav" aria-label="工作形式"><a href="/">圆桌讨论</a><a href="/lecture">定题演讲</a><a href="/story" aria-current="page">故事推演</a></nav>
+<main><aside><section class="card"><h2>设定一个处境</h2><form id="create-form">
+<label for="person">人物视角</label><select id="person" required></select>
+<label for="title-input">故事标题</label><input id="title-input" required maxlength="5000" placeholder="例如：工坊里的一次分歧">
+<label for="premise">人物已知的前置条件</label><textarea id="premise" required rows="3" maxlength="5000" placeholder="何时、何地、发生了什么？"></textarea>
+<label for="rules">规则与权限</label><textarea id="rules" required rows="2" maxlength="5000" placeholder="人物能做什么，不能做什么？"></textarea>
+<label for="goal">想达成的目标</label><input id="goal" required maxlength="5000">
+<label for="resources">可用资源（每行：名称=整数）</label><textarea id="resources" required rows="2">时间=6
+材料=5</textarea>
+<label for="known">已知世界事实（每行一条）</label><textarea id="known" rows="2" placeholder="只填写原创虚构设定"></textarea>
+<details><summary>尚未被人物获知的虚构事实</summary><label for="hidden">隐藏设定（每行一条）</label><textarea id="hidden" rows="2"></textarea><p class="hint">不放入人物已知的前置条件。后果模型可读取；不用于保存真实私人资料。</p></details>
+<label class="check"><input id="preview" type="checkbox">同意预览历史公共人物草稿，理解人物与故事质量尚未验收。</label><button class="primary" type="submit">保存故事设定</button></form></section>
+<section class="card"><h2>本机模型</h2><label for="model">已安装的 Ollama 模型名</label><input id="model" autocomplete="off"><label class="check"><input id="local-confirm" type="checkbox">确认使用本机 Ollama 服务</label><p class="hint">每步请求一次。暂停会拒收迟到结果，不保证停止模型计算。</p></section>
+<section class="card"><div class="section-head"><h2>最近的故事</h2><button id="refresh-list">刷新</button></div><div id="sessions" class="session-list"></div></section></aside>
+<div class="workspace"><section class="card"><div class="section-head"><h2 id="title">先给人物一个具体处境</h2><span class="badge" id="status">尚未创建</span></div><p class="hint">提出选择 → 你选择行动 → 推进后果；完成三次决策后整理成稿。</p><div id="alert" role="status" aria-live="polite"></div>
+<label for="branch">当前路径</label><select id="branch" disabled></select><p id="resources-view"></p><div class="toolbar"><button id="generate" class="primary" disabled>提出行动选择</button><button id="pause" disabled>暂停</button><button id="resume" disabled>恢复</button><button id="render" disabled>整理本路径成稿</button></div><div id="choices"></div><div id="history" class="turns"><p class="hint">每项行动都有代价，后果会保留在这条路径中。</p></div>
+<details><summary>从此前节点走另一条路</summary><label for="fork-point">选择前的保存点</label><select id="fork-point" disabled></select><button id="fork" disabled>创建替代路径</button><p class="hint">恢复该节点当时的资源与知识，原路径保留。</p></details></section>
+<section class="card"><h2>故事草稿与依据</h2><p class="hint">当前输出按实际路径整理，文学化润色和真实内容质量尚待验收。时间线包含内部因果说明。</p><div id="artifacts" class="toolbar"></div><pre id="artifact-preview">结局后可读取、下载故事草稿、时间线和依据附录。</pre></section></div></main><footer>公开历史人物的本地模拟；下载不代表通过公开发布审核。</footer></body></html>
