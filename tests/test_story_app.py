@@ -63,6 +63,37 @@ class StoryAppTests(unittest.TestCase):
             with self.assertRaises(HTTPError):self.request(f'/api/story-artifacts/{self.sid}/main/{name}')
         with self.assertRaises(HTTPError):self.action('generate',model='synthetic')
 
+    def test_narrative_edit_job_and_download_preserve_chronological_draft(self):
+        self.create()
+        with self.assertRaises(HTTPError):
+            self.action('edit', model='synthetic', confirm_local_service=True)
+        for _ in range(3):
+            self.advance('propose', self.proposal)
+            self.action('choose', version=self.view()['version'], index=0)
+            self.advance('effect', self.effect)
+        self.action('render')
+        original = self.request(f'/api/story-artifacts/{self.sid}/main/story.md')['content']
+        with patch.object(story_api.story_editor, 'OllamaProvider') as provider:
+            model = provider.return_value
+            model.inspect_identity.return_value = {'model': 'synthetic', 'digest': 'a'*64}
+            model.last_metrics = {'done_reason': 'stop'}
+            model.complete.return_value = {'content': json.dumps({'paragraphs': [
+                {'step': n, 'text': f'Original edited scene {n}.'} for n in (1, 2, 3)]})}
+            self.action('edit', model='synthetic', confirm_local_service=True)
+            for _ in range(100):
+                value = self.view()
+                if value['job']['status'] != 'running':
+                    break
+                time.sleep(.02)
+        self.assertEqual(value['job']['status'], 'done')
+        self.assertIsNotNone(value['edition'])
+        self.assertIn('edited scene', self.request(f'/api/story-artifacts/{self.sid}/main/narrative.md')['content'])
+        self.assertIn('决策 3', self.request(f'/api/story-artifacts/{self.sid}/main/narrative-provenance.md')['content'])
+        self.assertEqual(original, self.request(f'/api/story-artifacts/{self.sid}/main/story.md')['content'])
+        with self.assertRaises(HTTPError):
+            self.action('edit', model='synthetic', confirm_local_service=True)
+        self.assertIsNotNone(story_api.Stories(self.root).view(self.sid)['edition'])
+
     def test_async_failure_is_generic_and_state_retained(self):
         self.create()
         with patch.object(story_api.story_runner,'generate',side_effect=ValueError('SYNTHETIC_RAW_SECRET')):

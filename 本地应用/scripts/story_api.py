@@ -11,6 +11,7 @@ sys.path.insert(0, str(ROOT / "故事推演/scripts"))
 import story
 import story_runner
 import story_render
+import story_editor
 
 
 class Stories:
@@ -39,7 +40,11 @@ class Stories:
         state = story.load(identifier, branch, self.root)
         story.check_pins(state, self.root)
         fields = ("session_id", "branch_id", "version", "status", "display_name", "person_id", "preview", "simulation_notice", "pending")
-        return {k: state[k] for k in fields} | {"actor": story.actor_view(state), "job": job}
+        edition = None
+        location = story.branch_path(story.directory(identifier, self.root), branch)
+        if (location / "edition-current.json").exists():
+            edition = story_editor.read_edition(identifier, branch, root=self.root)
+        return {k: state[k] for k in fields} | {"actor": story.actor_view(state), "job": job, "edition": edition}
 
     def sessions(self):
         result = []
@@ -64,10 +69,14 @@ class Stories:
         return {"branches": branches, "fork_points": sorted(points, key=lambda p: (p["branch_id"], p["version"]))}
 
     def artifact(self, identifier, branch, name):
-        if name not in {"story.md", "timeline.md", "provenance.md"}:
+        if name not in {"story.md", "timeline.md", "provenance.md", "narrative.md", "narrative-provenance.md"}:
             raise ValueError("Unknown story artifact")
         path = story.directory(identifier, self.root)
         with story.store.locked(path):
+            if name in {"narrative.md", "narrative-provenance.md"}:
+                edition = story_editor.read_edition(identifier, branch, root=self.root)
+                file_name = "story.md" if name == "narrative.md" else "provenance.md"
+                return story.store.checked_file(path, edition["directory"] + "/" + file_name).read_text(encoding="utf-8")
             state = story.load(identifier, branch, self.root)
             story.check_pins(state, self.root)
             location = story.branch_path(path, branch)
@@ -92,23 +101,26 @@ class Stories:
             return story.mutate(identifier, branch, version, action, data.get("index") if action == "choose" else None, root=self.root)
         if action == "render":
             return story_render.render(identifier, branch=branch, root=self.root)
-        if action != "generate":
+        if action not in {"generate", "edit"}:
             raise ValueError("Unknown story action")
         model = data.get("model")
         if data.get("confirm_local_service") is not True or not isinstance(model, str) or not model.strip() or len(model) > 200:
             raise ValueError("Confirm installed local model")
         state = self.view(identifier, branch)
-        if state["status"] not in {"ready", "awaiting_effect"}:
+        if state["status"] not in ({"ended"} if action == "edit" else {"ready", "awaiting_effect"}):
             raise ValueError("Generation unavailable")
+        if action == "edit" and state["edition"] is not None:
+            raise ValueError("Narrative already exists")
         key = (identifier, branch)
         with self.guard:
             if self.jobs.get(key, {}).get("status") == "running" or sum(j["status"] == "running" for j in self.jobs.values()) >= 2:
                 raise ValueError("Story generation already running or capacity reached")
-            job = {"id": uuid.uuid4().hex, "status": "running"}
+            job = {"id": uuid.uuid4().hex, "status": "running", "action": action}
             self.jobs[key] = job
         def run():
             try:
-                result = story_runner.generate(identifier, model.strip(), branch=branch, root=self.root, confirm_local_service=True)
+                generate = story_editor.edit if action == "edit" else story_runner.generate
+                result = generate(identifier, model.strip(), branch=branch, root=self.root, confirm_local_service=True)
                 update = {"status": "done", "result": result}
             except Exception:
                 update = {"status": "failed", "error": "生成未完成。请检查本机模型与分支状态；已提交的选择和后果已保留。"}
