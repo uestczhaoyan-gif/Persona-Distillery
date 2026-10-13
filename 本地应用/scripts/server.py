@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from lecture_api import Lectures
 from story_api import Stories
+from overview import overview
 sys.path.insert(0, str(ROOT / "圆桌会议/scripts"))
 import roundtable as rt
 from roundtable_runner import generate_turn
@@ -170,6 +171,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond(403, {"error": "仅允许本机工作台访问。"})
         try:
             app = self.server.app
+            if path == "/api/overview":
+                return self.respond(200, overview(app))
             if path == "/api/story-library":
                 return self.respond(200, {"personas": app.stories.library()})
             if path == "/api/stories":
@@ -197,7 +200,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(200, app.view(parts[2]))
             if len(parts) == 4 and parts[:2] == ["api", "artifacts"]:
                 return self.respond(200, {"content": app.artifact(parts[2], parts[3])})
-            static = {"/": ("index.html", "text/html; charset=utf-8"),
+            static = {"/home": ("home.html", "text/html; charset=utf-8"),
+                      "/home.js": ("home.js", "text/javascript; charset=utf-8"),
+                      "/": ("index.html", "text/html; charset=utf-8"),
                       "/lecture": ("lecture.html", "text/html; charset=utf-8"),
                       "/story": ("story.html", "text/html; charset=utf-8"),
                       "/story.js": ("story.js", "text/javascript; charset=utf-8"),

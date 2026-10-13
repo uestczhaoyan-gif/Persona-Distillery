@@ -86,6 +86,8 @@ async function init() {
   const data=await api("/api/library");
   data.personas.forEach((p,i)=>{const label=element("label",undefined,"person"),input=element("input");input.type="checkbox";input.name="person";input.value=p.person_id;input.checked=i<3;label.append(input,element("span",p.display_name),element("small",p.requires_preview?"草稿":"可用"));$("personas").append(label);});
   await history();
+  const requested=new URLSearchParams(location.search).get("session");
+  if(requested) await select(requested);
 }
 init().catch(error=>report(error.message));
 setInterval(()=>{if(!busy) refresh().catch(error=>report(error.message));},2000);
