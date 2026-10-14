@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -25,11 +26,16 @@ section_index（提纲段落的从零开始编号）、text、evidence_ids、fac
 def snapshot(path, pointer_name, folder_name, json_name):
     pointer_file = runner.prep.checked_file(path, pointer_name)
     pointer = runner.prep.read_json(pointer_file)
+    return snapshot_pointer(path, pointer, folder_name, json_name), runner.storage.sha(pointer_file)
+
+
+def snapshot_pointer(path, pointer, folder_name="drafts", json_name="draft.json"):
     relative = pointer.get("snapshot", "")
     if not isinstance(relative, str) or not re.fullmatch(folder_name + r"/[0-9a-f]{32}", relative):
         raise ValueError("Invalid lecture snapshot")
     checksums = pointer.get("checksums")
-    if not isinstance(checksums, dict) or json_name not in checksums:
+    expected_files = {"draft.json", "speech.md", "provenance.md"} if folder_name == "drafts" else {"outline.json", "02-outline.md"}
+    if not isinstance(checksums, dict) or set(checksums) != expected_files:
         raise ValueError("Missing snapshot hashes")
     for name, digest in checksums.items():
         file = runner.prep.checked_file(path, relative + "/" + name)
@@ -38,7 +44,32 @@ def snapshot(path, pointer_name, folder_name, json_name):
     file = runner.prep.checked_file(path, relative + "/" + json_name)
     if file.stat().st_size > 500000:
         raise ValueError("Snapshot too large")
-    return runner.prep.read_json(file), runner.storage.sha(pointer_file)
+    return runner.prep.read_json(file)
+
+
+def history(path):
+    """Follow only checksum-linked published versions, never infer from folder names."""
+    if not (path / "draft-current.json").exists():
+        return [], False
+    pointer = runner.prep.read_json(runner.prep.checked_file(path, "draft-current.json"))
+    versions, seen = [], set()
+    while pointer is not None:
+        draft = snapshot_pointer(path, pointer)
+        identifier = pointer["snapshot"].split("/")[1]
+        if identifier in seen or len(versions) >= 1000:
+            raise ValueError("Invalid revision chain")
+        seen.add(identifier)
+        versions.append({"version_id": identifier, "pointer": pointer, "draft": draft})
+        previous = draft.get("previous_snapshot")
+        expected = draft.get("previous_pointer_sha256")
+        if previous is None:
+            return versions, expected is not None  # Legacy files were kept without a retrievable pointer.
+        if not isinstance(previous, dict):
+            raise ValueError("Invalid previous revision")
+        if hashlib.sha256(runner.storage.dump(previous).encode("utf-8")).hexdigest() != expected:
+            raise ValueError("Previous revision pointer changed")
+        pointer = previous
+    return versions, False
 
 
 def normalize(response, brief, outline, loaded):
@@ -109,7 +140,8 @@ def generate_draft(identifier, model, *, root=runner.prep.ROOT, confirm_local_se
             if previous_hash is not None and runner.storage.sha(path / "draft-current.json") != previous_hash:
                 raise ValueError("Previous draft changed")
             draft.update(model_identity=identity, input_sha256=input_hash, outline_sha256=outline_hash,
-                         previous_pointer_sha256=previous_hash, revision_request=revision)
+                         previous_pointer_sha256=previous_hash, revision_request=revision,
+                         previous_snapshot=runner.prep.read_json(path / "draft-current.json") if previous_hash else None)
             folder = path / "drafts" / uuid.uuid4().hex
             folder.mkdir(parents=True)
             speech = f"# {draft['title']}\n\n{runner.prep.NOTICE}\n\n" + "\n\n".join(p["text"] for p in draft["paragraphs"])

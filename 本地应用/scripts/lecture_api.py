@@ -75,6 +75,24 @@ class Lectures:
             relative = prep.read_json(path / pointer)["snapshot"]
             return prep.checked_file(path, relative + "/" + name).read_text(encoding="utf-8")
 
+    def versions(self, identifier):
+        path, _, _, _, _ = outlines.load_prepared(identifier, self.root)
+        values, legacy_gap = drafts.history(path)
+        return {"versions": [{"version_id": v["version_id"], "current": i == 0,
+                              "title": v["draft"]["title"], "revision_request": v["draft"].get("revision_request"),
+                              "character_count": v["draft"]["character_count"]} for i, v in enumerate(values)],
+                "legacy_gap": legacy_gap}
+
+    def version_artifact(self, identifier, version, name):
+        if name not in {"speech.md", "provenance.md", "draft.json"}:
+            raise ValueError("Unknown version artifact")
+        path, _, _, _, _ = outlines.load_prepared(identifier, self.root)
+        values, _ = drafts.history(path)
+        for value in values:
+            if value["version_id"] == version:
+                return prep.checked_file(path, value["pointer"]["snapshot"] + "/" + name).read_text(encoding="utf-8")
+        raise ValueError("Unknown committed revision")
+
     def action(self, identifier, action, data):
         if action not in {"outline", "draft", "revise"}:
             raise ValueError("Unknown lecture action")

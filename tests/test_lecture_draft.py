@@ -62,6 +62,28 @@ class LectureDraftTests(unittest.TestCase):
             self.generate()
         self.assertEqual(self.model.complete.call_count, count)
 
+    def test_history_detects_legacy_gap_and_rejects_unlinked_pointer(self):
+        self.generate()
+        self.generate("Original revision request")
+        versions, gap = draft.history(self.path)
+        self.assertEqual(len(versions), 2)
+        self.assertFalse(gap)
+        pointer = json.loads((self.path/'draft-current.json').read_text(encoding='utf-8'))
+        file = self.path/pointer['snapshot']/'draft.json'
+        content = json.loads(file.read_text(encoding='utf-8'))
+        content.pop('previous_snapshot')
+        draft.runner.storage.atomic(file,draft.runner.storage.dump(content))
+        pointer['checksums']['draft.json'] = draft.runner.storage.sha(file)
+        draft.runner.storage.atomic(self.path/'draft-current.json',draft.runner.storage.dump(pointer))
+        versions,gap=draft.history(self.path)
+        self.assertEqual(len(versions),1)
+        self.assertTrue(gap)
+        content['previous_snapshot']={'snapshot':'drafts/'+'0'*32,'checksums':{}}
+        draft.runner.storage.atomic(file,draft.runner.storage.dump(content))
+        pointer['checksums']['draft.json']=draft.runner.storage.sha(file)
+        draft.runner.storage.atomic(self.path/'draft-current.json',draft.runner.storage.dump(pointer))
+        with self.assertRaises(ValueError):draft.history(self.path)
+
     def test_source_snapshot_corruption_refused_before_model_call(self):
         pointer = json.loads((self.path / "outline-current.json").read_text(encoding="utf-8"))
         (self.path / pointer["snapshot"] / "outline.json").write_text("{}", encoding="utf-8")

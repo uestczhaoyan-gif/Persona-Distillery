@@ -61,6 +61,17 @@ class LectureAppTests(unittest.TestCase):
         self.assertNotIn("pins", self.request(f"/api/lectures/{self.sid}")["brief"])
         self.assertEqual(self.request("/api/lectures")["sessions"][0]["status"], "drafted")
         self.assertEqual(lecture_api.Lectures(self.root).view(self.sid)["draft"], result["draft"])
+        history = self.request(f"/api/lecture-versions/{self.sid}")
+        self.assertFalse(history["legacy_gap"])
+        self.assertEqual(len(history["versions"]),2)
+        old = history["versions"][1]["version_id"]
+        route = f"/api/lecture-version-artifacts/{self.sid}/{old}/speech.md"
+        self.assertIn("first synthetic",self.request(route)["content"])
+        with self.assertRaises(HTTPError):
+            self.request(f"/api/lecture-version-artifacts/{self.sid}/{'0'*32}/speech.md")
+        path = lecture_api.outlines.load_prepared(self.sid,self.root)[0]
+        (path/'drafts'/old/'speech.md').write_text('Synthetic manual change',encoding='utf-8')
+        with self.assertRaises(HTTPError):self.request(route)
 
     def test_failed_outline_preserves_prepared_brief_and_hides_raw_error(self):
         self.create()

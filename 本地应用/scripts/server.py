@@ -203,6 +203,10 @@ class Handler(BaseHTTPRequestHandler):
                 except KeyError:
                     return self.respond(404, {'error': '内存对话已结束，请重新开始。'})
                 return self.respond(200, value)
+            if len(parts) == 3 and parts[:2] == ["api", "lecture-versions"]:
+                return self.respond(200, app.lectures.versions(parts[2]))
+            if len(parts) == 5 and parts[:2] == ["api", "lecture-version-artifacts"]:
+                return self.respond(200, {"content": app.lectures.version_artifact(parts[2], parts[3], parts[4])})
             if len(parts) == 3 and parts[:2] == ["api", "lectures"]:
                 return self.respond(200, app.lectures.view(parts[2]))
             if len(parts) == 4 and parts[:2] == ["api", "lecture-artifacts"]:
