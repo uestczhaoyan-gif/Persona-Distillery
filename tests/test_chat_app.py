@@ -46,7 +46,8 @@ class ChatAppTests(unittest.TestCase):
         self.assertIn('post_hoc_audit',v['job']['audit']);self.assertNotIn('context',v)
         self.assertFalse((self.root/'直接对话/sessions').exists())
         self.action('close')
-        with self.assertRaises(HTTPError):self.request('/api/chats/'+self.sid)
+        with self.assertRaises(HTTPError) as missing:self.request('/api/chats/'+self.sid)
+        self.assertEqual(missing.exception.code,404)
 
     def test_failed_turn_keeps_previous_answer_and_generic_error(self):
         self.create();self.action('send',text='First synthetic question');self.wait()
@@ -72,6 +73,7 @@ class ChatAppTests(unittest.TestCase):
         self.action('send',text='Synthetic question');self.assertTrue(started.wait(2))
         with self.assertRaises(HTTPError):self.action('send',text='Duplicate')
         self.action('close');release.set()
-        with self.assertRaises(HTTPError):self.request('/api/chats/'+self.sid)
+        with self.assertRaises(HTTPError) as missing:self.request('/api/chats/'+self.sid)
+        self.assertEqual(missing.exception.code,404)
 
 if __name__=='__main__':unittest.main()
