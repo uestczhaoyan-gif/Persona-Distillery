@@ -38,10 +38,15 @@ class StoryAppTests(unittest.TestCase):
             self.action('choose',version=self.view()['version'],index=0)
             self.advance('effect',self.effect)
         self.assertEqual(self.view()['status'],'ended')
+        self.assertFalse(self.view()['rendered'])
         self.assertEqual(self.view(branch)['actor']['resources']['days'],6)
         self.assertNotIn('SYNTHETIC_SECRET',json.dumps(self.view()))
         self.assertNotIn('INTERNAL_CAUSE',json.dumps(self.view()))
         result=self.action('render')
+        self.assertTrue(self.view()['rendered'])
+        self.assertFalse(self.view(branch)['rendered'])
+        with fixture.story.store.locked(fixture.story.directory(self.sid,self.root)):
+            self.assertTrue(self.view()['rendered'])
         route=f'/api/story-artifacts/{self.sid}/main/story.md'
         self.assertIn('Ask',self.request(route)['content'])
         self.assertEqual(story_api.Stories(self.root).view(self.sid)['status'],'ended')
@@ -49,6 +54,7 @@ class StoryAppTests(unittest.TestCase):
         file=fixture.story.directory(self.sid,self.root)/result['directory']/'story.md'
         file.write_text('Manual change retained',encoding='utf-8')
         with self.assertRaises(HTTPError):self.request(route)
+        with self.assertRaises(HTTPError):self.view()
         self.assertEqual(file.read_text(encoding='utf-8'),'Manual change retained')
 
     def test_stale_version_preview_and_artifact_boundaries(self):

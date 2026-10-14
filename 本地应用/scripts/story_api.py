@@ -44,7 +44,12 @@ class Stories:
         location = story.branch_path(story.directory(identifier, self.root), branch)
         if (location / "edition-current.json").exists():
             edition = story_editor.read_edition(identifier, branch, root=self.root)
-        return {k: state[k] for k in fields} | {"actor": story.actor_view(state), "job": job, "edition": edition}
+        rendered = False
+        if (location / "result-current.json").exists():
+            for name in ("story.md", "timeline.md", "provenance.md"):
+                self._read_artifact(identifier, branch, name)
+            rendered = True
+        return {k: state[k] for k in fields} | {"actor": story.actor_view(state), "job": job, "edition": edition, "rendered": rendered}
 
     def sessions(self):
         result = []
@@ -69,27 +74,33 @@ class Stories:
         return {"branches": branches, "fork_points": sorted(points, key=lambda p: (p["branch_id"], p["version"]))}
 
     def artifact(self, identifier, branch, name):
+        path = story.directory(identifier, self.root)
+        with story.store.locked(path):
+            return self._read_artifact(identifier, branch, name)
+
+    def _read_artifact(self, identifier, branch, name):
+        # Published files and pointers are immutable/atomic. Status reads must not
+        # compete for the writer lock while a narrative job commits its edition.
         if name not in {"story.md", "timeline.md", "provenance.md", "narrative.md", "narrative-provenance.md"}:
             raise ValueError("Unknown story artifact")
         path = story.directory(identifier, self.root)
-        with story.store.locked(path):
-            if name in {"narrative.md", "narrative-provenance.md"}:
-                edition = story_editor.read_edition(identifier, branch, root=self.root)
-                file_name = "story.md" if name == "narrative.md" else "provenance.md"
-                return story.store.checked_file(path, edition["directory"] + "/" + file_name).read_text(encoding="utf-8")
-            state = story.load(identifier, branch, self.root)
-            story.check_pins(state, self.root)
-            location = story.branch_path(path, branch)
-            current = story.store.read_json(story.store.checked_file(location, "current.json"))
-            result = story.store.read_json(story.store.checked_file(location, "result-current.json"))
-            if (result.get("session_id") != identifier or result.get("branch_id") != branch
-                    or result.get("source_snapshot") != current["snapshot"]
-                    or result.get("directory") != "rendered/" + current["snapshot"] or state["status"] != "ended"):
-                raise ValueError("Result does not match current branch")
-            file = story.store.checked_file(path, result["directory"] + "/" + name)
-            if story.store.sha(file) != result["checksums"][name]:
-                raise ValueError("Result changed")
-            return file.read_text(encoding="utf-8")
+        if name in {"narrative.md", "narrative-provenance.md"}:
+            edition = story_editor.read_edition(identifier, branch, root=self.root)
+            file_name = "story.md" if name == "narrative.md" else "provenance.md"
+            return story.store.checked_file(path, edition["directory"] + "/" + file_name).read_text(encoding="utf-8")
+        state = story.load(identifier, branch, self.root)
+        story.check_pins(state, self.root)
+        location = story.branch_path(path, branch)
+        current = story.store.read_json(story.store.checked_file(location, "current.json"))
+        result = story.store.read_json(story.store.checked_file(location, "result-current.json"))
+        if (result.get("session_id") != identifier or result.get("branch_id") != branch
+                or result.get("source_snapshot") != current["snapshot"]
+                or result.get("directory") != "rendered/" + current["snapshot"] or state["status"] != "ended"):
+            raise ValueError("Result does not match current branch")
+        file = story.store.checked_file(path, result["directory"] + "/" + name)
+        if story.store.sha(file) != result["checksums"][name]:
+            raise ValueError("Result changed")
+        return file.read_text(encoding="utf-8")
 
     def action(self, identifier, branch, action, data):
         if action == "fork":
